@@ -28,7 +28,7 @@ jobs:
       run: flutter pub get
 
     - name: Generate Android Scaffold
-      run: flutter create . --platforms=android --org com.vmusic.app my_music
-
+      run: flutter create . --platforms=android --org com.vmusic.app
+  
     - name: Build APK
       run: flutter build apk --debug
