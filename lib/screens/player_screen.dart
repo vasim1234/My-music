@@ -12,8 +12,7 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool isPlaying = false;
-  String currentFileName = "No file selected";
-  double audioSpeed = 1.0;
+  String currentFileName = "No song selected";
   bool is3DMode = false;
 
   @override
@@ -55,7 +54,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('3D Sound Music Player'),
+        title: const Text('My Music 3D'),
+        centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -64,22 +64,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Visualizer / 3D Icon Box
             Container(
-              height: 200,
-              width: 200,
+              height: 180,
+              width: 180,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   colors: [Colors.deepPurple, Colors.purpleAccent],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.deepPurpleAccent.withOpacity(0.5),
-                    blurRadius: is3DMode ? 30 : 10,
-                    spreadRadius: is3DMode ? 10 : 2,
+                    blurRadius: is3DMode ? 35 : 12,
+                    spreadRadius: is3DMode ? 8 : 2,
                   ),
                 ],
               ),
@@ -92,9 +89,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            // 3D Sound Toggle
             SwitchListTile(
-              title: const Text('3D Surround Sound Effect'),
+              title: const Text('3D Sound Effect'),
               value: is3DMode,
               activeColor: Colors.purpleAccent,
               onChanged: (val) {
@@ -102,7 +98,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
               },
             ),
             const SizedBox(height: 30),
-            // Controls Row
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
