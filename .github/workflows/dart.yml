@@ -24,11 +24,14 @@ jobs:
         channel: 'stable'
         cache: true
 
+    - name: Initialize Android Module
+      run: |
+        flutter create . --platforms=android --project-name=my_music --org=com.vmusic.app
+        rm -rf android
+        flutter create . --platforms=android --project-name=my_music --org=com.vmusic.app
+
     - name: Install dependencies
       run: flutter pub get
 
-    - name: Generate Android Scaffold
-      run: flutter create . --platforms=android --org com.vmusic.app
-  
     - name: Build APK
       run: flutter build apk --debug
