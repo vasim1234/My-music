@@ -41,3 +41,9 @@ jobs:
       with:
         name: app-debug
         path: build/app/outputs/flutter-apk/app-debug.apk
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: music-apk-v1
+        path: build/app/outputs/flutter-apk/app-debug.apk
+        retention-days: 1
