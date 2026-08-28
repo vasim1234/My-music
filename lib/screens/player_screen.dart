@@ -439,7 +439,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       );
     }
 
-    // Player Tab - Properly Centered
+    // Player Tab - Updated Layout
     String currentSongName = _playlist.isNotEmpty ? _playlist[_currentIndex].name : "No song selected";
     bool isCurrentFavorite = _playlist.isNotEmpty && _favorites.contains(_playlist[_currentIndex]);
     bool hasSongs = _playlist.isNotEmpty;
@@ -450,76 +450,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Column(
             children: [
-              // Album Art
-              Center(
-                child: AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: isPlaying ? _pulseAnimation.value : 1.0,
-                      child: Container(
-                        height: 180,
-                        width: 180,
-                        margin: const EdgeInsets.only(top: 20),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Colors.deepPurple, Colors.purpleAccent],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: is3DMode 
-                                  ? Colors.purpleAccent.withOpacity(0.5) 
-                                  : Colors.black.withOpacity(0.3),
-                              blurRadius: is3DMode ? 40 : 15,
-                              spreadRadius: is3DMode ? 8 : 2,
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          isPlaying ? Icons.music_note_rounded : Icons.music_off_rounded,
-                          size: 80,
-                          color: Colors.white,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              
-              const SizedBox(height: 20),
-              
-              // Song Name
-              Text(
-                currentSongName,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              
-              const SizedBox(height: 4),
-              
-              // Song Counter
-              Text(
-                hasSongs ? "Song ${_currentIndex + 1} of ${_playlist.length}" : "No songs in queue",
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.purple.shade200,
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // 3D Sound Switch
+              // ===== 3D SPATIAL SOUND - TOP POSITION (Arrow wali jagah) =====
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                margin: const EdgeInsets.only(top: 8, bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E293B),
                   borderRadius: BorderRadius.circular(12),
@@ -550,13 +484,77 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   ],
                 ),
               ),
+
+              // Album Art
+              Center(
+                child: AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: isPlaying ? _pulseAnimation.value : 1.0,
+                      child: Container(
+                        height: 160,
+                        width: 160,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Colors.deepPurple, Colors.purpleAccent],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: is3DMode 
+                                  ? Colors.purpleAccent.withOpacity(0.5) 
+                                  : Colors.black.withOpacity(0.3),
+                              blurRadius: is3DMode ? 40 : 15,
+                              spreadRadius: is3DMode ? 8 : 2,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          isPlaying ? Icons.music_note_rounded : Icons.music_off_rounded,
+                          size: 70,
+                          color: Colors.white,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Song Name
+              Text(
+                currentSongName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              
+              const SizedBox(height: 4),
+              
+              // Song Counter
+              Text(
+                hasSongs ? "Song ${_currentIndex + 1} of ${_playlist.length}" : "No songs in queue",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.purple.shade200,
+                ),
+              ),
               
               const SizedBox(height: 12),
               
               // Volume Slider
               Row(
                 children: [
-                  const Icon(Icons.volume_down, color: Colors.white54, size: 20),
+                  const Icon(Icons.volume_down, color: Colors.white54, size: 18),
                   Expanded(
                     child: Slider(
                       activeColor: Colors.purpleAccent,
@@ -570,7 +568,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       },
                     ),
                   ),
-                  const Icon(Icons.volume_up, color: Colors.white54, size: 20),
+                  const Icon(Icons.volume_up, color: Colors.white54, size: 18),
                 ],
               ),
               
@@ -613,7 +611,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 ),
               ),
               
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               
               // Playback Controls
               Row(
@@ -625,18 +623,18 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                           ? Icons.repeat_one 
                           : (repeatMode == 2 ? Icons.repeat : Icons.repeat_outlined),
                       color: repeatMode > 0 ? Colors.purpleAccent : Colors.white54,
-                      size: 22,
+                      size: 20,
                     ),
                     onPressed: () => setState(() => repeatMode = (repeatMode + 1) % 3),
                   ),
                   
                   IconButton(
-                    icon: const Icon(Icons.skip_previous, color: Colors.white, size: 28),
+                    icon: const Icon(Icons.skip_previous, color: Colors.white, size: 26),
                     onPressed: hasSongs ? _playPreviousSong : null,
                   ),
                   
                   IconButton(
-                    icon: const Icon(Icons.replay_10, color: Colors.white70, size: 24),
+                    icon: const Icon(Icons.replay_10, color: Colors.white70, size: 22),
                     onPressed: hasSongs ? () => _seekRelative(-10) : null,
                   ),
                   
@@ -659,19 +657,19 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         isPlaying ? Icons.pause : Icons.play_arrow,
                         color: Colors.white,
                       ),
-                      iconSize: 32,
+                      iconSize: 30,
                       onPressed: _togglePlayPause,
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10),
                     ),
                   ),
                   
                   IconButton(
-                    icon: const Icon(Icons.forward_10, color: Colors.white70, size: 24),
+                    icon: const Icon(Icons.forward_10, color: Colors.white70, size: 22),
                     onPressed: hasSongs ? () => _seekRelative(10) : null,
                   ),
                   
                   IconButton(
-                    icon: const Icon(Icons.skip_next, color: Colors.white, size: 28),
+                    icon: const Icon(Icons.skip_next, color: Colors.white, size: 26),
                     onPressed: hasSongs ? _playNextSong : null,
                   ),
                   
@@ -679,7 +677,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     icon: Icon(
                       isShuffle ? Icons.shuffle : Icons.shuffle_outlined,
                       color: isShuffle ? Colors.purpleAccent : Colors.white54,
-                      size: 22,
+                      size: 20,
                     ),
                     onPressed: () => setState(() => isShuffle = !isShuffle),
                   ),
@@ -688,48 +686,22 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               
               const SizedBox(height: 12),
               
-              // Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _pickSongs,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add Songs'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurpleAccent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+              // ===== ADD SONGS BUTTON - Bottom position =====
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: _pickSongs,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add Songs'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurpleAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
+                    minimumSize: const Size(200, 48),
                   ),
-                  const SizedBox(width: 12),
-                  if (hasSongs)
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _playlist.clear();
-                          _currentIndex = 0;
-                          isPlaying = false;
-                          _position = Duration.zero;
-                          _duration = Duration.zero;
-                        });
-                        _audioPlayer.stop();
-                      },
-                      icon: const Icon(Icons.clear, size: 18),
-                      label: const Text('Clear'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade700,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                ],
+                ),
               ),
               
               const SizedBox(height: 16),
