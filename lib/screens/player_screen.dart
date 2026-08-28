@@ -1,104 +1,7 @@
-// Add these dependencies in pubspec.yaml first:
-// dependencies:
-//   audioplayers: ^5.2.1
-//   file_picker: ^6.1.1
-//   audio_service: ^0.18.10
-//   just_audio: ^0.9.36
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:audio_service/audio_service.dart';
-import 'package:just_audio/just_audio.dart';
-
-// ============================================================
-// 1. AUDIO SERVICE FOR BACKGROUND PLAYBACK
-// ============================================================
-class MusicPlayerTask extends BackgroundAudioTask {
-  final AudioPlayer _player = AudioPlayer();
-  bool _playing = false;
-  String _currentTitle = 'No song playing';
-  String _currentArtist = 'Local Audio';
-
-  @override
-  Future<void> onStart(Map<String, dynamic>? params) async {
-    await _updateMediaItem();
-  }
-
-  Future<void> _updateMediaItem() async {
-    final mediaItem = MediaItem(
-      id: 'current_song',
-      album: 'My Music 3D',
-      title: _currentTitle,
-      artist: _currentArtist,
-      duration: Duration.zero,
-    );
-    AudioService.setMediaItem(mediaItem);
-    await _updatePlaybackState();
-  }
-
-  Future<void> _updatePlaybackState() async {
-    final controls = _playing
-        ? [
-            MediaControl.skipToPrevious,
-            MediaControl.pause,
-            MediaControl.skipToNext,
-          ]
-        : [
-            MediaControl.skipToPrevious,
-            MediaControl.play,
-            MediaControl.skipToNext,
-          ];
-    
-    AudioService.setPlaybackState(
-      PlaybackState(
-        controls: controls,
-        playing: _playing,
-        systemActions: const {
-          MediaAction.seekTo,
-          MediaAction.skipToNext,
-          MediaAction.skipToPrevious,
-        },
-      ),
-    );
-  }
-
-  @override
-  Future<void> onPlay() async {
-    _playing = true;
-    await _player.resume();
-    await _updatePlaybackState();
-  }
-
-  @override
-  Future<void> onPause() async {
-    _playing = false;
-    await _player.pause();
-    await _updatePlaybackState();
-  }
-
-  @override
-  Future<void> onSkipToNext() async {
-    // Will be handled by main player
-    _currentTitle = 'Next Song';
-    await _updateMediaItem();
-  }
-
-  @override
-  Future<void> onSkipToPrevious() async {
-    _currentTitle = 'Previous Song';
-    await _updateMediaItem();
-  }
-
-  @override
-  Future<void> onStop() async {
-    await _player.stop();
-    _playing = false;
-    await _updatePlaybackState();
-    await super.onStop();
-  }
-}
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -131,7 +34,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // Search
   String _searchQuery = '';
   
-  // Sleep Timer
+  // Sleep Timer - FIXED
   bool _sleepTimerActive = false;
   int _sleepTimerMinutes = 0;
   Timer? _sleepTimer;
@@ -139,9 +42,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // Custom Playlists
   final Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
-
-  // Background Audio Service
-  bool _backgroundServiceInitialized = false;
 
   // Helper function to clean song name
   String _cleanSongName(String fileName) {
@@ -171,18 +71,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
     _audioPlayer.onDurationChanged.listen((newDuration) {
       if (mounted) setState(() => _duration = newDuration);
-      // Update background service
-      if (_backgroundServiceInitialized) {
-        AudioService.setMediaItem(
-          MediaItem(
-            id: 'current_song',
-            album: 'My Music 3D',
-            title: _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].name) : 'No song',
-            artist: 'Local Audio',
-            duration: newDuration,
-          ),
-        );
-      }
     });
     
     _audioPlayer.onPositionChanged.listen((newPosition) {
@@ -192,9 +80,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     _audioPlayer.onPlayerComplete.listen((_) {
       _handleSongCompletion();
     });
-
-    // Initialize background service
-    _initBackgroundService();
   }
 
   @override
@@ -203,44 +88,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     _audioPlayer.dispose();
     _sleepTimer?.cancel();
     super.dispose();
-  }
-
-  // ===== BACKGROUND SERVICE INITIALIZATION =====
-  Future<void> _initBackgroundService() async {
-    try {
-      await AudioService.init(
-        builder: () => MusicPlayerTask(),
-        config: const AudioServiceConfig(
-          androidNotificationChannelId: 'com.myapp.music.channel',
-          androidNotificationChannelName: 'My Music 3D',
-          androidNotificationOngoing: true,
-          androidStopForegroundOnPause: true,
-          androidNotificationIcon: 'mipmap/ic_launcher',
-        ),
-      );
-      setState(() => _backgroundServiceInitialized = true);
-    } catch (e) {
-      debugPrint('Background service error: $e');
-    }
-  }
-
-  void _updateBackgroundService(String title, bool playing) {
-    if (_backgroundServiceInitialized) {
-      AudioService.setMediaItem(
-        MediaItem(
-          id: 'current_song',
-          album: 'My Music 3D',
-          title: title,
-          artist: 'Local Audio',
-          duration: _duration,
-        ),
-      );
-      if (playing) {
-        AudioService.play();
-      } else {
-        AudioService.pause();
-      }
-    }
   }
 
   void _handleSongCompletion() {
@@ -252,10 +99,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       if (_currentIndex < _playlist.length - 1) {
         _playNextSong();
       } else {
-        if (mounted) {
-          setState(() => isPlaying = false);
-          _updateBackgroundService('Stopped', false);
-        }
+        if (mounted) setState(() => isPlaying = false);
       }
     }
   }
@@ -283,7 +127,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 _duration = Duration.zero;
               });
               _audioPlayer.stop();
-              _updateBackgroundService('Stopped', false);
               Navigator.pop(context);
             },
             child: const Text('Clear', style: TextStyle(color: Colors.red)),
@@ -293,13 +136,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ===== SLEEP TIMER =====
+  // ===== SLEEP TIMER - FIXED =====
   void _startSleepTimer(int minutes) {
     setState(() {
       _sleepTimerActive = true;
       _sleepTimerMinutes = minutes;
     });
     
+    // FIXED: Correct Timer syntax
     _sleepTimer = Timer(Duration(minutes: minutes), () {
       setState(() {
         _sleepTimerActive = false;
@@ -307,7 +151,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       });
       _audioPlayer.stop();
       setState(() => isPlaying = false);
-      _updateBackgroundService('Stopped', false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -381,16 +224,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     setState(() {
       _customPlaylists[name.trim()] = [];
       _newPlaylistName = '';
-    });
-  }
-
-  void _addToPlaylist(String playlistName, PlatformFile song) {
-    setState(() {
-      if (_customPlaylists.containsKey(playlistName)) {
-        if (!_customPlaylists[playlistName]!.contains(song)) {
-          _customPlaylists[playlistName]!.add(song);
-        }
-      }
     });
   }
 
@@ -478,7 +311,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     
     try {
       final currentFile = _playlist[_currentIndex];
-      String cleanName = _cleanSongName(currentFile.name);
       
       if (!_recent.contains(currentFile)) {
         _recent.insert(0, currentFile);
@@ -490,11 +322,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         await _audioPlayer.play(DeviceFileSource(currentFile.path!));
         await _audioPlayer.setVolume(_volume);
         await _audioPlayer.setBalance(is3DMode ? 0.5 : 0.0);
-        if (mounted) {
-          setState(() => isPlaying = true);
-          // Update background service
-          _updateBackgroundService(cleanName, true);
-        }
+        if (mounted) setState(() => isPlaying = true);
       }
     } catch (e) {
       debugPrint('Error playing song: $e');
@@ -548,17 +376,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     try {
       if (isPlaying) {
         await _audioPlayer.pause();
-        if (mounted) {
-          setState(() => isPlaying = false);
-          _updateBackgroundService('Paused', false);
-        }
+        if (mounted) setState(() => isPlaying = false);
       } else {
         await _audioPlayer.resume();
-        if (mounted) {
-          setState(() => isPlaying = true);
-          String cleanName = _cleanSongName(_playlist[_currentIndex].name);
-          _updateBackgroundService(cleanName, true);
-        }
+        if (mounted) setState(() => isPlaying = true);
       }
     } catch (e) {
       debugPrint('Error toggling play/pause: $e');
@@ -889,20 +710,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.timer, color: Colors.white, size: 16),
-                    ),
-                  ),
-                // Background Service Indicator
-                if (_backgroundServiceInitialized && isPlaying)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.check, color: Colors.white, size: 12),
                     ),
                   ),
               ],
