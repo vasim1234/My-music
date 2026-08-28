@@ -38,11 +38,15 @@ jobs:
   
     - name: Create Release & Upload APK
       uses: softprops/action-gh-release@v1
+    permissions:
+        contents: write
       with:
         files: build/app/outputs/flutter-apk/app-debug.apk
         tag_name: v1.0.${{ github.run_number }}
         name: "My-Music App v1.0.${{ github.run_number }}"
         body: "Lo bhai! Naya APK ready hai. Niche diye link se download kar lo! 🎵"
-      env:
+        env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
 
