@@ -15,7 +15,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool isPlaying = false;
   bool is3DMode = false;
 
-  // Playlist & Queue Management
   List<PlatformFile> _playlist = [];
   int _currentIndex = 0;
 
@@ -27,17 +26,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void initState() {
     super.initState();
     _audioPlayer.onDurationChanged.listen((newDuration) {
-      setState(() {
-        _duration = newDuration;
-      });
+      setState(() => _duration = newDuration);
     });
     _audioPlayer.onPositionChanged.listen((newPosition) {
-      setState(() {
-        _position = newPosition;
-      });
+      setState(() => _position = newPosition);
     });
-
-    // Song khatam hone par automatically agla song play karne ke liye (Queue auto-advance)
     _audioPlayer.onPlayerComplete.listen((_) {
       _playNextSong();
     });
@@ -49,7 +42,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     super.dispose();
   }
 
-  // Multiple Songs Pick karne ke liye (Playlist/Queue)
   Future<void> _pickSongs() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.audio,
@@ -65,10 +57,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
-  // Queue me se specific index wala song play karne ke liye
   Future<void> _playCurrentSongInQueue() async {
     if (_playlist.isEmpty) return;
-    
     final currentFile = _playlist[_currentIndex];
     if (currentFile.path != null) {
       await _audioPlayer.stop();
@@ -78,10 +68,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (is3DMode) {
         await _audioPlayer.setBalance(0.5);
       }
-
-      setState(() {
-        isPlaying = true;
-      });
+      setState(() => isPlaying = true);
     }
   }
 
@@ -124,6 +111,79 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return "$minutes:$seconds";
   }
 
+  // Queue ko ek popup Bottom Sheet mein dikhane ka function
+  void _showQueueBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          height: 400,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.between,
+                children: [
+                  const Text(
+                    'Playback Queue',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const Divider(color: Colors.white24),
+              Expanded(
+                child: _playlist.isEmpty
+                    ? const Center(child: Text('Queue is empty', style: TextStyle(color: Colors.white54)))
+                    : ListView.builder(
+                        itemCount: _playlist.length,
+                        itemBuilder: (context, index) {
+                          bool isCurrent = index == _currentIndex;
+                          return Container(
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isCurrent ? Colors.purple.withOpacity(0.3) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: ListTile(
+                              leading: Icon(
+                                isCurrent ? Icons.play_arrow : Icons.music_note,
+                                color: isCurrent ? Colors.purpleAccent : Colors.white70,
+                              ),
+                              title: Text(
+                                _playlist[index].name,
+                                style: TextStyle(
+                                  color: isCurrent ? Colors.purpleAccent : Colors.white,
+                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () {
+                                setState(() => _currentIndex = index);
+                                _playCurrentSongInQueue();
+                                Navigator.pop(context);
+                              },
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     String currentSongName = _playlist.isNotEmpty 
@@ -133,72 +193,81 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        title: const Text('My Music 3D & Queue', style: TextStyle(color: Colors.white)),
+        title: const Text('My Music 3D', style: TextStyle(color: Colors.white)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          // Queue dekhne ke liye AppBar mein button
+          IconButton(
+            icon: const Icon(Icons.queue_music, color: Colors.white),
+            onPressed: () => _showQueueBottomSheet(context),
+            tooltip: 'View Queue',
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Smooth Animated Card Layout for Player Art
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: is3DMode 
-                        ? Colors.purpleAccent.withOpacity(0.4) 
-                        : Colors.black.withOpacity(0.3),
-                    blurRadius: is3DMode ? 30 : 15,
-                    spreadRadius: is3DMode ? 5 : 2,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 400),
-                    height: 130,
-                    width: 130,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Colors.deepPurple, Colors.purpleAccent],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+            // Center Album Art Card
+            Expanded(
+              child: Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 500),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: is3DMode ? Colors.purpleAccent.withOpacity(0.4) : Colors.black.withOpacity(0.3),
+                        blurRadius: is3DMode ? 35 : 15,
+                        spreadRadius: is3DMode ? 6 : 2,
+                        offset: const Offset(0, 8),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: is3DMode ? Colors.purpleAccent.withOpacity(0.8) : Colors.transparent,
-                          blurRadius: 25,
-                          spreadRadius: 8,
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        height: 140,
+                        width: 140,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Colors.deepPurple, Colors.purpleAccent],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: is3DMode ? Colors.purpleAccent.withOpacity(0.8) : Colors.transparent,
+                              blurRadius: 25,
+                              spreadRadius: 8,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: const Icon(Icons.music_note_rounded, size: 60, color: Colors.white),
+                        child: const Icon(Icons.music_note_rounded, size: 70, color: Colors.white),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        currentSongName,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _playlist.isNotEmpty ? "Song ${_currentIndex + 1} of ${_playlist.length}" : "Queue empty",
+                        style: TextStyle(fontSize: 12, color: Colors.purple.shade200),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    currentSongName,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    _playlist.isNotEmpty ? "Song ${_currentIndex + 1} of ${_playlist.length}" : "Queue empty",
-                    style: TextStyle(fontSize: 12, color: Colors.purple.shade200),
-                  ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 15),
@@ -235,9 +304,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               onChanged: (value) async {
                 final position = Duration(seconds: value.toInt());
                 await _audioPlayer.seek(position);
-                setState(() {
-                  _position = position;
-                });
+                setState(() => _position = position);
               },
             ),
             Padding(
@@ -252,7 +319,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
             const SizedBox(height: 10),
             
-            // Player Controls (Previous, Rewind, Play/Pause, Forward, Next)
+            // Player Controls
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -292,7 +359,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               color: const Color(0xFF1E293B),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
                 child: Row(
                   children: [
                     const Icon(Icons.volume_down, color: Colors.white70, size: 20),
@@ -304,9 +371,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         max: 1.0,
                         value: _volume,
                         onChanged: (val) async {
-                          setState(() {
-                            _volume = val;
-                          });
+                          setState(() => _volume = val);
                           if (!is3DMode) {
                             await _audioPlayer.setVolume(_volume);
                           }
@@ -320,7 +385,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
             const SizedBox(height: 15),
 
-            // Add Songs to Queue Button
+            // Add Songs Button
             ElevatedButton.icon(
               onPressed: _pickSongs,
               icon: const Icon(Icons.playlist_add),
@@ -332,57 +397,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
-            const SizedBox(height: 15),
-
-            // Queue List View Display
-            if (_playlist.isNotEmpty) ...[
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Playback Queue', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 8),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _playlist.length,
-                itemBuilder: (context, index) {
-                  bool isCurrent = index == _currentIndex;
-                  return Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isCurrent ? Colors.purple.withOpacity(0.2) : const Color(0xFF1E293B).withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: isCurrent ? Colors.purpleAccent : Colors.transparent),
-                    ),
-                    child: ListTile(
-                      leading: Icon(
-                        isCurrent ? Icons.play_arrow : Icons.music_note, 
-                        color: isCurrent ? Colors.purpleAccent : Colors.white70,
-                      ),
-                      title: Text(
-                        _playlist[index].name,
-                        style: TextStyle(
-                          color: isCurrent ? Colors.purpleAccent : Colors.white,
-                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                          fontSize: 14,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onTap: () {
-                        setState(() {
-                          _currentIndex = index;
-                        });
-                        _playCurrentSongInQueue();
-                      },
-                    ),
-                  );
-                },
-              ),
-            ],
+            const SizedBox(height: 10),
           ],
         ),
       ),
     );
   }
 }
+
