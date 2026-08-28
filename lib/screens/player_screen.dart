@@ -19,7 +19,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   bool isShuffle = false;
   int repeatMode = 0;
   
-  List<PlatformFile> _playlist = [];
+  final List<PlatformFile> _playlist = [];
   final List<PlatformFile> _favorites = [];
   final List<PlatformFile> _recent = [];
   int _currentIndex = 0;
@@ -33,22 +33,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   // Helper function to clean song name
   String _cleanSongName(String fileName) {
-    // Remove extension
     String name = fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
-    
-    // Remove (MP3_320K), (320K), etc.
     name = name.replaceAll(RegExp(r'\(\w*_\d+K\)', caseSensitive: false), '');
     name = name.replaceAll(RegExp(r'\(\d+K\)', caseSensitive: false), '');
     name = name.replaceAll(RegExp(r'\(MP3_\d+K\)', caseSensitive: false), '');
-    
-    // Remove extra spaces
     name = name.trim();
     
-    // If name is too long, truncate
-    if (name.length > 40) {
-      name = name.substring(0, 40) + '...';
+    if (name.length > 35) {
+      name = '${name.substring(0, 35)}...';
     }
-    
     return name;
   }
 
@@ -66,11 +59,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
 
     _audioPlayer.onDurationChanged.listen((newDuration) {
-      setState(() => _duration = newDuration);
+      if (mounted) setState(() => _duration = newDuration);
     });
     
     _audioPlayer.onPositionChanged.listen((newPosition) {
-      setState(() => _position = newPosition);
+      if (mounted) setState(() => _position = newPosition);
     });
     
     _audioPlayer.onPlayerComplete.listen((_) {
@@ -94,7 +87,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       if (_currentIndex < _playlist.length - 1) {
         _playNextSong();
       } else {
-        setState(() => isPlaying = false);
+        if (mounted) setState(() => isPlaying = false);
       }
     }
   }
@@ -113,21 +106,25 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             _currentIndex = 0;
           }
         });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${result.files.length} songs added'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${result.files.length} songs added'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 1),
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
@@ -178,10 +175,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         await _audioPlayer.play(DeviceFileSource(currentFile.path!));
         await _audioPlayer.setVolume(_volume);
         await _audioPlayer.setBalance(is3DMode ? 0.5 : 0.0);
-        setState(() => isPlaying = true);
+        if (mounted) setState(() => isPlaying = true);
       }
     } catch (e) {
-      print('Error: $e');
+      debugPrint('Error playing song: $e');
     }
   }
 
@@ -189,24 +186,23 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     int index = _playlist.indexOf(song);
     if (index != -1) {
       setState(() => _currentIndex = index);
-      await _playCurrentSongInQueue();
     } else {
       setState(() {
         _playlist.add(song);
         _currentIndex = _playlist.length - 1;
       });
-      await _playCurrentSongInQueue();
     }
+    await _playCurrentSongInQueue();
   }
 
   Future<void> _playNextSong() async {
     if (_playlist.isEmpty) return;
     
-    if (isShuffle) {
+    if (isShuffle && _playlist.length > 1) {
       int newIndex;
       do {
         newIndex = DateTime.now().millisecondsSinceEpoch % _playlist.length;
-      } while (newIndex == _currentIndex && _playlist.length > 1);
+      } while (newIndex == _currentIndex);
       setState(() => _currentIndex = newIndex);
     } else {
       setState(() {
@@ -233,13 +229,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     try {
       if (isPlaying) {
         await _audioPlayer.pause();
-        setState(() => isPlaying = false);
+        if (mounted) setState(() => isPlaying = false);
       } else {
         await _audioPlayer.resume();
-        setState(() => isPlaying = true);
+        if (mounted) setState(() => isPlaying = true);
       }
     } catch (e) {
-      print('Error: $e');
+      debugPrint('Error toggling play/pause: $e');
     }
   }
 
@@ -292,105 +288,101 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       ),
       isScrollControlled: true,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateModal) {
-            return Container(
-              padding: const EdgeInsets.all(20),
-              height: MediaQuery.of(context).size.height * 0.6,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        return Container(
+          padding: const EdgeInsets.all(20),
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Text(
-                            'Queue',
-                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.purpleAccent.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${_playlist.length}',
-                              style: const TextStyle(color: Colors.purpleAccent, fontSize: 12),
-                            ),
-                          ),
-                        ],
+                      const Text(
+                        'Queue',
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white70),
-                        onPressed: () => Navigator.pop(context),
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.purpleAccent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${_playlist.length}',
+                          style: const TextStyle(color: Colors.purpleAccent, fontSize: 12),
+                        ),
                       ),
                     ],
                   ),
-                  const Divider(color: Colors.white24),
-                  Expanded(
-                    child: _playlist.isEmpty
-                        ? const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.queue_music, size: 50, color: Colors.white24),
-                                SizedBox(height: 10),
-                                Text('Queue is empty', style: TextStyle(color: Colors.white54)),
-                              ],
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _playlist.length,
-                            itemBuilder: (context, index) {
-                              bool isCurrent = index == _currentIndex;
-                              String cleanName = _cleanSongName(_playlist[index].name);
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  radius: 14,
-                                  backgroundColor: isCurrent ? Colors.purpleAccent : Colors.grey.shade800,
-                                  child: Text(
-                                    '${index + 1}',
-                                    style: TextStyle(
-                                      color: isCurrent ? Colors.white : Colors.white54,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                title: Text(
-                                  cleanName,
-                                  style: TextStyle(
-                                    color: isCurrent ? Colors.purpleAccent : Colors.white,
-                                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (_favorites.contains(_playlist[index]))
-                                      const Icon(Icons.favorite, color: Colors.redAccent, size: 16),
-                                    if (isCurrent)
-                                      const Icon(Icons.play_arrow, color: Colors.purpleAccent),
-                                  ],
-                                ),
-                                onTap: () {
-                                  setState(() => _currentIndex = index);
-                                  _playCurrentSongInQueue();
-                                  Navigator.pop(context);
-                                },
-                              );
-                            },
-                          ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
-            );
-          },
+              const Divider(color: Colors.white24),
+              Expanded(
+                child: _playlist.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.queue_music, size: 50, color: Colors.white24),
+                            SizedBox(height: 10),
+                            Text('Queue is empty', style: TextStyle(color: Colors.white54)),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _playlist.length,
+                        itemBuilder: (context, index) {
+                          bool isCurrent = index == _currentIndex;
+                          String cleanName = _cleanSongName(_playlist[index].name);
+                          return ListTile(
+                            leading: CircleAvatar(
+                              radius: 14,
+                              backgroundColor: isCurrent ? Colors.purpleAccent : Colors.grey.shade800,
+                              child: Text(
+                                '${index + 1}',
+                                style: TextStyle(
+                                  color: isCurrent ? Colors.white : Colors.white54,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              cleanName,
+                              style: TextStyle(
+                                color: isCurrent ? Colors.purpleAccent : Colors.white,
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_favorites.contains(_playlist[index]))
+                                  const Icon(Icons.favorite, color: Colors.redAccent, size: 16),
+                                if (isCurrent)
+                                  const Icon(Icons.play_arrow, color: Colors.purpleAccent),
+                              ],
+                            ),
+                            onTap: () {
+                              setState(() => _currentIndex = index);
+                              _playCurrentSongInQueue();
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -404,44 +396,49 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          height: 180,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Volume',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              Row(
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              height: 180,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.volume_down, color: Colors.white54),
-                  Expanded(
-                    child: Slider(
-                      activeColor: Colors.purpleAccent,
-                      inactiveColor: Colors.grey.shade800,
-                      min: 0.0,
-                      max: 1.0,
-                      value: _volume,
-                      onChanged: (value) async {
-                        setState(() => _volume = value);
-                        await _audioPlayer.setVolume(value);
-                      },
+                  const Text(
+                    'Volume',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.volume_down, color: Colors.white54),
+                      Expanded(
+                        child: Slider(
+                          activeColor: Colors.purpleAccent,
+                          inactiveColor: Colors.grey.shade800,
+                          min: 0.0,
+                          max: 1.0,
+                          value: _volume,
+                          onChanged: (value) async {
+                            setModalState(() => _volume = value);
+                            setState(() => _volume = value);
+                            await _audioPlayer.setVolume(value);
+                          },
+                        ),
+                      ),
+                      const Icon(Icons.volume_up, color: Colors.white54),
+                    ],
+                  ),
+                  Center(
+                    child: Text(
+                      '${(_volume * 100).toInt()}%',
+                      style: const TextStyle(color: Colors.purpleAccent, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
-                  const Icon(Icons.volume_up, color: Colors.white54),
                 ],
               ),
-              Center(
-                child: Text(
-                  '${(_volume * 100).toInt()}%',
-                  style: const TextStyle(color: Colors.purpleAccent, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -449,15 +446,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   Widget _buildBodyContent() {
     if (_selectedIndex == 1) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
-        appBar: AppBar(
-          title: const Text('Favorites ❤️', style: TextStyle(color: Colors.white)),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actions: [
-            if (_favorites.isNotEmpty)
-              IconButton(
+      return Column(
+        children: [
+          if (_favorites.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
                 icon: const Icon(Icons.delete_sweep, color: Colors.white54),
                 onPressed: () {
                   setState(() => _favorites.clear());
@@ -470,140 +464,126 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   );
                 },
               ),
-          ],
-        ),
-        body: _favorites.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.favorite_border, size: 60, color: Colors.white24),
-                    SizedBox(height: 10),
-                    Text('No favorite songs yet', style: TextStyle(color: Colors.white54)),
-                    SizedBox(height: 5),
-                    Text('Tap ♡ on any song to add', style: TextStyle(color: Colors.white24, fontSize: 12)),
-                  ],
-                ),
-              )
-            : ListView.builder(
-                itemCount: _favorites.length,
-                itemBuilder: (context, index) {
-                  final song = _favorites[index];
-                  String cleanName = _cleanSongName(song.name);
-                  return ListTile(
-                    leading: const Icon(Icons.favorite, color: Colors.redAccent),
-                    title: Text(
-                      cleanName,
-                      style: const TextStyle(color: Colors.white),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+            ),
+          Expanded(
+            child: _favorites.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.favorite_border, size: 60, color: Colors.white24),
+                        SizedBox(height: 10),
+                        Text('No favorite songs yet', style: TextStyle(color: Colors.white54)),
+                        SizedBox(height: 5),
+                        Text('Tap ♡ on any song to add', style: TextStyle(color: Colors.white24, fontSize: 12)),
+                      ],
                     ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white54, size: 18),
-                      onPressed: () {
-                        setState(() => _favorites.remove(song));
-                      },
-                    ),
-                    onTap: () => _playSpecificSong(song),
-                  );
-                },
-              ),
+                  )
+                : ListView.builder(
+                    itemCount: _favorites.length,
+                    itemBuilder: (context, index) {
+                      final song = _favorites[index];
+                      String cleanName = _cleanSongName(song.name);
+                      return ListTile(
+                        leading: const Icon(Icons.favorite, color: Colors.redAccent),
+                        title: Text(
+                          cleanName,
+                          style: const TextStyle(color: Colors.white),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+                          onPressed: () {
+                            setState(() => _favorites.remove(song));
+                          },
+                        ),
+                        onTap: () => _playSpecificSong(song),
+                      );
+                    },
+                  ),
+          ),
+        ],
       );
     } else if (_selectedIndex == 2) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
-        appBar: AppBar(
-          title: const Text('Recent 🕐', style: TextStyle(color: Colors.white)),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        body: _recent.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.history, size: 60, color: Colors.white24),
-                    SizedBox(height: 10),
-                    Text('No recent songs', style: TextStyle(color: Colors.white54)),
-                  ],
-                ),
-              )
-            : ListView.builder(
-                itemCount: _recent.length,
-                itemBuilder: (context, index) {
-                  final song = _recent[index];
-                  String cleanName = _cleanSongName(song.name);
-                  return ListTile(
-                    leading: const Icon(Icons.history, color: Colors.purpleAccent),
-                    title: Text(
-                      cleanName,
-                      style: const TextStyle(color: Colors.white),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Text(
-                      '${index + 1}',
-                      style: TextStyle(color: Colors.white24, fontSize: 12),
-                    ),
-                    onTap: () => _playSpecificSong(song),
-                  );
-                },
+      return _recent.isEmpty
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.history, size: 60, color: Colors.white24),
+                  SizedBox(height: 10),
+                  Text('No recent songs', style: TextStyle(color: Colors.white54)),
+                ],
               ),
-      );
+            )
+          : ListView.builder(
+              itemCount: _recent.length,
+              itemBuilder: (context, index) {
+                final song = _recent[index];
+                String cleanName = _cleanSongName(song.name);
+                return ListTile(
+                  leading: const Icon(Icons.history, color: Colors.purpleAccent),
+                  title: Text(
+                    cleanName,
+                    style: const TextStyle(color: Colors.white),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Text(
+                    '${index + 1}',
+                    style: const TextStyle(color: Colors.white24, fontSize: 12),
+                  ),
+                  onTap: () => _playSpecificSong(song),
+                );
+              },
+            );
     } else if (_selectedIndex == 3) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
-        appBar: AppBar(
-          title: const Text('Playlists 📁', style: TextStyle(color: Colors.white)),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Card(
-                color: const Color(0xFF1E293B),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: ListTile(
-                  leading: const Icon(Icons.playlist_play, color: Colors.purpleAccent, size: 30),
-                  title: const Text('Current Queue', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  subtitle: Text('${_playlist.length} Songs', style: const TextStyle(color: Colors.white70)),
-                  trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54),
-                  onTap: () => _showQueueBottomSheet(context),
-                ),
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Card(
+              color: const Color(0xFF1E293B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                leading: const Icon(Icons.playlist_play, color: Colors.purpleAccent, size: 30),
+                title: const Text('Current Queue', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: Text('${_playlist.length} Songs', style: const TextStyle(color: Colors.white70)),
+                trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54),
+                onTap: () => _showQueueBottomSheet(context),
               ),
-              const SizedBox(height: 10),
-              Card(
-                color: const Color(0xFF1E293B),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: ListTile(
-                  leading: const Icon(Icons.favorite, color: Colors.redAccent, size: 30),
-                  title: const Text('Favorites', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  subtitle: Text('${_favorites.length} Songs', style: const TextStyle(color: Colors.white70)),
-                  trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54),
-                  onTap: () => setState(() => _selectedIndex = 1),
-                ),
+            ),
+            const SizedBox(height: 10),
+            Card(
+              color: const Color(0xFF1E293B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                leading: const Icon(Icons.favorite, color: Colors.redAccent, size: 30),
+                title: const Text('Favorites', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: Text('${_favorites.length} Songs', style: const TextStyle(color: Colors.white70)),
+                trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54),
+                onTap: () => setState(() => _selectedIndex = 1),
               ),
-              const SizedBox(height: 10),
-              Card(
-                color: const Color(0xFF1E293B),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: ListTile(
-                  leading: const Icon(Icons.history, color: Colors.purpleAccent, size: 30),
-                  title: const Text('Recent', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  subtitle: Text('${_recent.length} Songs', style: const TextStyle(color: Colors.white70)),
-                  trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54),
-                  onTap: () => setState(() => _selectedIndex = 2),
-                ),
+            ),
+            const SizedBox(height: 10),
+            Card(
+              color: const Color(0xFF1E293B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                leading: const Icon(Icons.history, color: Colors.purpleAccent, size: 30),
+                title: const Text('Recent', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: Text('${_recent.length} Songs', style: const TextStyle(color: Colors.white70)),
+                trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54),
+                onTap: () => setState(() => _selectedIndex = 2),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
 
-    // Player Tab - Clean
+    // Player Tab
     String currentSongName = _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].name) : "No song selected";
     bool isCurrentFavorite = _playlist.isNotEmpty && _favorites.contains(_playlist[_currentIndex]);
     bool hasSongs = _playlist.isNotEmpty;
@@ -615,8 +595,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Spacer(flex: 1),
-            
-            // Album Art
             Center(
               child: AnimatedBuilder(
                 animation: _pulseAnimation,
@@ -624,8 +602,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   return Transform.scale(
                     scale: isPlaying ? _pulseAnimation.value : 1.0,
                     child: Container(
-                      height: 200,
-                      width: 200,
+                      height: 180,
+                      width: 180,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
@@ -638,14 +616,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             color: is3DMode 
                                 ? Colors.purpleAccent.withOpacity(0.4) 
                                 : Colors.black.withOpacity(0.3),
-                            blurRadius: is3DMode ? 50 : 20,
-                            spreadRadius: is3DMode ? 10 : 2,
+                            blurRadius: is3DMode ? 40 : 20,
+                            spreadRadius: is3DMode ? 8 : 2,
                           ),
                         ],
                       ),
                       child: Icon(
                         isPlaying ? Icons.music_note_rounded : Icons.music_off_rounded,
-                        size: 80,
+                        size: 75,
                         color: Colors.white,
                       ),
                     ),
@@ -653,15 +631,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 },
               ),
             ),
-            
-            const SizedBox(height: 25),
-            
-            // Song Name - Clean and Truncated
+            const SizedBox(height: 20),
             Text(
               currentSongName,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 17,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 letterSpacing: 0.3,
@@ -669,9 +644,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            
             const SizedBox(height: 5),
-            
             Text(
               hasSongs ? "Song ${_currentIndex + 1} of ${_playlist.length}" : "No songs",
               style: TextStyle(
@@ -679,10 +652,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 color: Colors.grey.shade400,
               ),
             ),
-            
-            const SizedBox(height: 20),
-            
-            // Progress Bar
+            const SizedBox(height: 15),
             Slider(
               activeColor: Colors.purpleAccent,
               inactiveColor: Colors.grey.shade800,
@@ -702,8 +672,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 setState(() => _position = position);
               },
             ),
-            
-            // Time Labels
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: Row(
@@ -720,10 +688,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 ],
               ),
             ),
-            
             const SizedBox(height: 8),
-            
-            // Playback Controls
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -737,17 +702,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   ),
                   onPressed: () => setState(() => repeatMode = (repeatMode + 1) % 3),
                 ),
-                
                 IconButton(
                   icon: const Icon(Icons.skip_previous, color: Colors.white, size: 28),
                   onPressed: hasSongs ? _playPreviousSong : null,
                 ),
-                
                 IconButton(
                   icon: const Icon(Icons.replay_10, color: Colors.white70, size: 24),
                   onPressed: hasSongs ? () => _seekRelative(-10) : null,
                 ),
-                
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 8),
                   decoration: BoxDecoration(
@@ -773,17 +735,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     padding: const EdgeInsets.all(12),
                   ),
                 ),
-                
                 IconButton(
                   icon: const Icon(Icons.forward_10, color: Colors.white70, size: 24),
                   onPressed: hasSongs ? () => _seekRelative(10) : null,
                 ),
-                
                 IconButton(
                   icon: const Icon(Icons.skip_next, color: Colors.white, size: 28),
                   onPressed: hasSongs ? _playNextSong : null,
                 ),
-                
                 IconButton(
                   icon: Icon(
                     isShuffle ? Icons.shuffle : Icons.shuffle_outlined,
@@ -794,20 +753,16 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 ),
               ],
             ),
-            
             const Spacer(flex: 1),
-            
-            // Bottom Actions - Heart, 3D, Volume
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Favorite Button
                   GestureDetector(
                     onTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : null,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         color: isCurrentFavorite 
                             ? Colors.red.withOpacity(0.1) 
@@ -824,11 +779,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                           Icon(
                             isCurrentFavorite ? Icons.favorite : Icons.favorite_border,
                             color: isCurrentFavorite ? Colors.redAccent : Colors.white54,
-                            size: 20,
+                            size: 18,
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            isCurrentFavorite ? 'Favorite' : 'Add to Fav',
+                            isCurrentFavorite ? 'Favorite' : 'Add Fav',
                             style: TextStyle(
                               color: isCurrentFavorite ? Colors.redAccent : Colors.white54,
                               fontSize: 12,
@@ -838,10 +793,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       ),
                     ),
                   ),
-                  
-                  const SizedBox(width: 12),
-                  
-                  // 3D Mode Toggle
+                  const SizedBox(width: 10),
                   GestureDetector(
                     onTap: () async {
                       setState(() => is3DMode = !is3DMode);
@@ -854,7 +806,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       }
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         color: is3DMode 
                             ? Colors.purpleAccent.withOpacity(0.15) 
@@ -886,14 +838,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       ),
                     ),
                   ),
-                  
-                  const SizedBox(width: 12),
-                  
-                  // Volume Button
+                  const SizedBox(width: 10),
                   GestureDetector(
                     onTap: () => _showVolumePopup(context),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.grey.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(20),
@@ -931,6 +880,19 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
+  String _getAppBarTitle() {
+    switch (_selectedIndex) {
+      case 1:
+        return 'Favorites ❤️';
+      case 2:
+        return 'Recent 🕐';
+      case 3:
+        return 'Playlists 📁';
+      default:
+        return 'My Music 3D';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -938,12 +900,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       appBar: AppBar(
         title: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.music_note, color: Colors.purpleAccent, size: 22),
-            SizedBox(width: 8),
+          children: [
+            if (_selectedIndex == 0) ...[
+              const Icon(Icons.music_note, color: Colors.purpleAccent, size: 22),
+              const SizedBox(width: 8),
+            ],
             Text(
-              'My Music 3D',
-              style: TextStyle(
+              _getAppBarTitle(),
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
@@ -954,19 +918,16 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // Add Songs
           IconButton(
             icon: const Icon(Icons.add, color: Colors.white70),
             onPressed: _pickSongs,
             tooltip: 'Add Songs',
           ),
-          // Queue
           IconButton(
             icon: const Icon(Icons.queue_music, color: Colors.white70),
             onPressed: () => _showQueueBottomSheet(context),
             tooltip: 'Queue',
           ),
-          // More
           PopupMenuButton(
             icon: const Icon(Icons.more_vert, color: Colors.white70),
             color: const Color(0xFF1E293B),
