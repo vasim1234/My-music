@@ -37,11 +37,9 @@ jobs:
       run: flutter build apk --debug
   
     - name: Send APK to Telegram
-      env:
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: |
-        curl -F chat_id="$TELEGRAM_CHAT_ID" \
-             -F document=@"build/app/outputs/flutter-apk/app-debug.apk" \
-             -F caption="Lo bhai, aapka My-Music APK ready hai! 🎵" \
-             "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument"
+      uses: appleboy/telegram-action@master
+      with:
+        to: ${{ secrets.TELEGRAM_CHAT_ID }}
+        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        document: build/app/outputs/flutter-apk/app-debug.apk
+        caption: "Lo bhai, aapka My-Music APK ready hai! 🎵"
