@@ -66,13 +66,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   void _handleSongCompletion() {
     if (repeatMode == 1) {
-      // Repeat One
       _playCurrentSongInQueue();
     } else if (repeatMode == 2) {
-      // Repeat All
       _playNextSong();
     } else {
-      // No Repeat
       if (_currentIndex < _playlist.length - 1) {
         _playNextSong();
       } else {
@@ -200,7 +197,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   Future<void> _seekRelative(int seconds) async {
     final newPosition = _position + Duration(seconds: seconds);
-    await _audioPlayer.seek(newPosition.clamp(Duration.zero, _duration));
+    // FIXED: Manual clamp since Duration doesn't have clamp method
+    final clampedPosition = newPosition > _duration 
+        ? _duration 
+        : (newPosition < Duration.zero ? Duration.zero : newPosition);
+    await _audioPlayer.seek(clampedPosition);
   }
 
   String _formatDuration(Duration duration) {
