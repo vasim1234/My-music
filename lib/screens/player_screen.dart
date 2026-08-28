@@ -161,7 +161,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.between,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Playback Queue', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   IconButton(
@@ -446,7 +446,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // Add songs button clean icon in top appbar
           IconButton(
             icon: const Icon(Icons.library_add, color: Colors.purpleAccent),
             onPressed: _pickSongs,
@@ -481,4 +480,3 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 }
-
