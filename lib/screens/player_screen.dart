@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async'; // Added for Timer
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
@@ -21,7 +22,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
   }
 
   Future<void> _setupMediaItem() async {
-    final mediaItem = MediaItem(
+    final mediaItem = const MediaItem(
       id: 'current_song',
       album: 'My Music 3D',
       title: 'Song Playing',
@@ -77,14 +78,10 @@ class AudioPlayerTask extends BackgroundAudioTask {
   }
 
   @override
-  Future<void> onSkipToNext() async {
-    // Handle next song
-  }
+  Future<void> onSkipToNext() async {}
 
   @override
-  Future<void> onSkipToPrevious() async {
-    // Handle previous song
-  }
+  Future<void> onSkipToPrevious() async {}
 
   @override
   Future<void> onStop() async {
@@ -115,7 +112,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   int repeatMode = 0;
   
   // Playlist
-  List<PlatformFile> _playlist = [];
+  final List<PlatformFile> _playlist = [];
   final List<PlatformFile> _favorites = [];
   final List<PlatformFile> _recent = [];
   int _currentIndex = 0;
@@ -132,7 +129,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // ===== NEW FEATURES VARIABLES =====
   // 1. Search
   String _searchQuery = '';
-  bool _isSearching = false;
   
   // 2. Device Music
   final OnAudioQuery _audioQuery = OnAudioQuery();
@@ -192,12 +188,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         uriType: UriType.EXTERNAL,
         ignoreCase: true,
       );
-      setState(() {
-        _deviceSongs = songs;
-        _isLoadingDeviceSongs = false;
-      });
+      if (mounted) {
+        setState(() {
+          _deviceSongs = songs;
+          _isLoadingDeviceSongs = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoadingDeviceSongs = false);
+      if (mounted) setState(() => _isLoadingDeviceSongs = false);
     }
   }
 
@@ -209,16 +207,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     setState(() {
       _customPlaylists[name.trim()] = [];
       _newPlaylistName = '';
-    });
-  }
-
-  void _addToPlaylist(String playlistName, PlatformFile song) {
-    setState(() {
-      if (_customPlaylists.containsKey(playlistName)) {
-        if (!_customPlaylists[playlistName]!.contains(song)) {
-          _customPlaylists[playlistName]!.add(song);
-        }
-      }
     });
   }
 
@@ -241,12 +229,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           decoration: const InputDecoration(
             hintText: 'Playlist name',
             hintStyle: TextStyle(color: Colors.grey),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.purpleAccent),
-            ),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.purpleAccent)),
           ),
           onChanged: (value) => _newPlaylistName = value,
         ),
@@ -276,19 +260,19 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _sleepTimerMinutes = minutes;
     });
     
+    _sleepTimer?.cancel();
     _sleepTimer = Timer(Duration(minutes: minutes), () {
-      setState(() {
-        _sleepTimerActive = false;
-        _sleepTimerMinutes = 0;
-      });
-      _audioPlayer.stop();
-      setState(() => isPlaying = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⏰ Sleep timer stopped playback'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          _sleepTimerActive = false;
+          _sleepTimerMinutes = 0;
+          isPlaying = false;
+        });
+        _audioPlayer.stop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('⏰ Sleep timer stopped playback'), backgroundColor: Colors.orange),
+        );
+      }
     });
   }
 
@@ -355,9 +339,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       isScrollControlled: true,
       builder: (context) {
         return StatefulBuilder(
@@ -371,18 +353,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Equalizer',
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white70),
-                        onPressed: () => Navigator.pop(context),
-                      ),
+                      const Text('Equalizer', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      IconButton(icon: const Icon(Icons.close, color: Colors.white70), onPressed: () => Navigator.pop(context)),
                     ],
                   ),
                   const Divider(color: Colors.white24),
-                  // Preset Chips
                   Wrap(
                     spacing: 8,
                     children: _eqPresets.keys.map((preset) {
@@ -402,7 +377,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     }).toList(),
                   ),
                   const SizedBox(height: 20),
-                  // Bass Slider
                   _buildEqSlider('Bass', 'bass', setModalState),
                   _buildEqSlider('Treble', 'treble', setModalState),
                   _buildEqSlider('Mid', 'mid', setModalState),
@@ -422,10 +396,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: const TextStyle(color: Colors.white70)),
-            Text(
-              '${(_eqValues[key]! * 10).toInt()} dB',
-              style: const TextStyle(color: Colors.purpleAccent),
-            ),
+            Text('${(_eqValues[key]! * 10).toInt()} dB', style: const TextStyle(color: Colors.purpleAccent)),
           ],
         ),
         Slider(
@@ -484,30 +455,38 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _handleSongCompletion();
     });
 
-    // Auto-scan device music
     _scanDeviceMusic();
   }
 
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    _audioPlayer.dispose();
-    _sleepTimer?.cancel();
-    super.dispose();
-  }
-
-  void _handleSongCompletion() {
-    if (repeatMode == 1) {
-      _playCurrentSongInQueue();
-    } else if (repeatMode == 2) {
-      _playNextSong();
-    } else {
-      if (_currentIndex < _playlist.length - 1) {
-        _playNextSong();
-      } else {
-        if (mounted) setState(() => isPlaying = false);
-      }
-    }
+  void _clearQueue() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Clear Queue?', style: TextStyle(color: Colors.white)),
+        content: const Text('Remove all songs from queue?', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _playlist.clear();
+                _currentIndex = 0;
+                isPlaying = false;
+                _position = Duration.zero;
+                _duration = Duration.zero;
+              });
+              _audioPlayer.stop();
+              Navigator.pop(context);
+            },
+            child: const Text('Clear', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickSongs() async {
@@ -526,11 +505,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${result.files.length} songs added'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 1),
-            ),
+            SnackBar(content: Text('${result.files.length} songs added'), backgroundColor: Colors.green, duration: const Duration(seconds: 1)),
           );
         }
       }
@@ -609,7 +584,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       await _pickSongs();
       return;
     }
-    
     try {
       if (isPlaying) {
         await _audioPlayer.pause();
@@ -625,9 +599,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   Future<void> _seekRelative(int seconds) async {
     final newPosition = _position + Duration(seconds: seconds);
-    final clampedPosition = newPosition > _duration 
-        ? _duration 
-        : (newPosition < Duration.zero ? Duration.zero : newPosition);
+    final clampedPosition = newPosition > _duration ? _duration : (newPosition < Duration.zero ? Duration.zero : newPosition);
     await _audioPlayer.seek(clampedPosition);
   }
 
@@ -636,20 +608,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       if (_favorites.contains(song)) {
         _favorites.remove(song);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Removed from favorites'),
-            backgroundColor: Colors.grey,
-            duration: Duration(seconds: 1),
-          ),
+          const SnackBar(content: Text('Removed from favorites'), backgroundColor: Colors.grey, duration: Duration(seconds: 1)),
         );
       } else {
         _favorites.add(song);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Added to favorites ❤️'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 1),
-          ),
+          const SnackBar(content: Text('Added to favorites ❤️'), backgroundColor: Colors.red, duration: Duration(seconds: 1)),
         );
       }
     });
@@ -659,9 +623,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
@@ -671,10 +633,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Volume',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
+                  const Text('Volume', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -697,10 +656,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     ],
                   ),
                   Center(
-                    child: Text(
-                      '${(_volume * 100).toInt()}%',
-                      style: const TextStyle(color: Colors.purpleAccent, fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
+                    child: Text('${(_volume * 100).toInt()}%', style: const TextStyle(color: Colors.purpleAccent, fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -715,9 +671,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       isScrollControlled: true,
       builder: (context) {
         return StatefulBuilder(
@@ -733,46 +687,27 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     children: [
                       Row(
                         children: [
-                          const Text(
-                            'Queue',
-                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
+                          const Text('Queue', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                           const SizedBox(width: 10),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.purpleAccent.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${_playlist.length}',
-                              style: const TextStyle(color: Colors.purpleAccent, fontSize: 12),
-                            ),
+                            decoration: BoxDecoration(color: Colors.purpleAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                            child: Text('${_playlist.length}', style: const TextStyle(color: Colors.purpleAccent, fontSize: 12)),
                           ),
                         ],
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white70),
-                        onPressed: () => Navigator.pop(context),
-                      ),
+                      IconButton(icon: const Icon(Icons.close, color: Colors.white70), onPressed: () => Navigator.pop(context)),
                     ],
                   ),
                   const Divider(color: Colors.white24),
-                  // Search in Queue
                   TextField(
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: 'Search in queue...',
                       hintStyle: const TextStyle(color: Colors.grey),
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.grey),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.purpleAccent),
-                      ),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.grey)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.purpleAccent)),
                     ),
                     onChanged: (value) {
                       setModalState(() => _searchQuery = value);
@@ -802,32 +737,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 leading: CircleAvatar(
                                   radius: 14,
                                   backgroundColor: isCurrent ? Colors.purpleAccent : Colors.grey.shade800,
-                                  child: Text(
-                                    '${originalIndex + 1}',
-                                    style: TextStyle(
-                                      color: isCurrent ? Colors.white : Colors.white54,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  child: Text('${originalIndex + 1}', style: TextStyle(color: isCurrent ? Colors.white : Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                                 ),
-                                title: Text(
-                                  cleanName,
-                                  style: TextStyle(
-                                    color: isCurrent ? Colors.purpleAccent : Colors.white,
-                                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                title: Text(cleanName, style: TextStyle(color: isCurrent ? Colors.purpleAccent : Colors.white, fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal), maxLines: 1, overflow: TextOverflow.ellipsis),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    if (_favorites.contains(song))
-                                      const Icon(Icons.favorite, color: Colors.redAccent, size: 16),
+                                    if (_favorites.contains(song)) const Icon(Icons.favorite, color: Colors.redAccent, size: 16),
                                     const SizedBox(width: 4),
-                                    if (isCurrent)
-                                      const Icon(Icons.play_arrow, color: Colors.purpleAccent),
+                                    if (isCurrent) const Icon(Icons.play_arrow, color: Colors.purpleAccent),
                                   ],
                                 ),
                                 onTap: () {
@@ -851,18 +769,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // ============================================================
   // 10. UI BUILDERS
   // ============================================================
-  
-  // Device Music Tab
   Widget _buildDeviceMusicTab() {
     return Column(
       children: [
         if (_isLoadingDeviceSongs)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(color: Colors.purpleAccent),
-            ),
-          )
+          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: Colors.purpleAccent)))
         else if (_deviceSongs.isEmpty)
           const Center(
             child: Padding(
@@ -889,65 +800,26 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   leading: QueryArtworkWidget(
                     id: song.id,
                     type: ArtworkType.AUDIO,
-                    nullArtworkWidget: const CircleAvatar(
-                      backgroundColor: Colors.grey.shade800,
-                      child: Icon(Icons.music_note, color: Colors.white54),
-                    ),
+                    nullArtworkWidget: CircleAvatar(backgroundColor: Colors.grey.shade800, child: const Icon(Icons.music_note, color: Colors.white54)),
                   ),
-                  title: Text(
-                    song.title,
-                    style: const TextStyle(color: Colors.white),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    song.artist ?? 'Unknown Artist',
-                    style: const TextStyle(color: Colors.white54),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  title: Text(song.title, style: const TextStyle(color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(song.artist ?? 'Unknown Artist', style: const TextStyle(color: Colors.white54), maxLines: 1, overflow: TextOverflow.ellipsis),
                   trailing: PopupMenuButton(
                     icon: const Icon(Icons.more_vert, color: Colors.white54),
                     color: const Color(0xFF1E293B),
                     onSelected: (value) {
                       if (value == 'add') {
-                        // Add to queue
-                        final file = PlatformFile(
-                          name: song.title,
-                          path: song.data,
-                          size: 0,
-                        );
-                        setState(() {
-                          _playlist.add(file);
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Added to queue'),
-                            backgroundColor: Colors.green,
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
+                        final file = PlatformFile(name: song.title, path: song.data, size: 0);
+                        setState(() => _playlist.add(file));
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to queue'), backgroundColor: Colors.green, duration: Duration(seconds: 1)));
                       }
                     },
                     itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'add',
-                        child: Row(
-                          children: [
-                            Icon(Icons.playlist_add, color: Colors.white),
-                            SizedBox(width: 10),
-                            Text('Add to Queue', style: TextStyle(color: Colors.white)),
-                          ],
-                        ),
-                      ),
+                      const PopupMenuItem(value: 'add', child: Row(children: [Icon(Icons.playlist_add, color: Colors.white), SizedBox(width: 10), Text('Add to Queue', style: TextStyle(color: Colors.white))])),
                     ],
                   ),
                   onTap: () {
-                    final file = PlatformFile(
-                      name: song.title,
-                      path: song.data,
-                      size: 0,
-                    );
+                    final file = PlatformFile(name: song.title, path: song.data, size: 0);
                     _playSpecificSong(file);
                   },
                 );
@@ -958,7 +830,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // Custom Playlists Tab
   Widget _buildCustomPlaylistsTab() {
     if (_customPlaylists.isEmpty) {
       return Center(
@@ -975,10 +846,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               onPressed: _showCreatePlaylistDialog,
               icon: const Icon(Icons.add),
               label: const Text('Create Playlist'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.purpleAccent,
-                foregroundColor: Colors.white,
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.purpleAccent, foregroundColor: Colors.white),
             ),
           ],
         ),
@@ -995,49 +863,21 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: ExpansionTile(
-            title: Text(
-              playlistName,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              '${songs.length} songs',
-              style: const TextStyle(color: Colors.white54),
-            ),
+            title: Text(playlistName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            subtitle: Text('${songs.length} songs', style: const TextStyle(color: Colors.white54)),
             leading: const Icon(Icons.playlist_play, color: Colors.purpleAccent),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: () {
-                    setState(() {
-                      _customPlaylists.remove(playlistName);
-                    });
-                  },
-                ),
+                IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => setState(() => _customPlaylists.remove(playlistName))),
               ],
             ),
             children: songs.isEmpty
-                ? [
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text('No songs in this playlist', style: TextStyle(color: Colors.white54)),
-                    ),
-                  ]
+                ? [const Padding(padding: EdgeInsets.all(16), child: Text('No songs in this playlist', style: TextStyle(color: Colors.white54)))]
                 : songs.map((song) {
                     return ListTile(
-                      title: Text(
-                        _cleanSongName(song.name),
-                        style: const TextStyle(color: Colors.white),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white54),
-                        onPressed: () {
-                          _removeFromPlaylist(playlistName, song);
-                        },
-                      ),
+                      title: Text(_cleanSongName(song.name), style: const TextStyle(color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      trailing: IconButton(icon: const Icon(Icons.close, color: Colors.white54), onPressed: () => _removeFromPlaylist(playlistName, song)),
                       onTap: () => _playSpecificSong(song),
                     );
                   }).toList(),
@@ -1047,7 +887,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // Main Player UI
   Widget _buildPlayerUI() {
     String currentSongName = _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].name) : "No song selected";
     bool isCurrentFavorite = _playlist.isNotEmpty && _favorites.contains(_playlist[_currentIndex]);
@@ -1060,8 +899,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Spacer(flex: 1),
-            
-            // Album Art with Marquee
             Stack(
               alignment: Alignment.center,
               children: [
@@ -1075,61 +912,35 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         width: 180,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Colors.deepPurple, Colors.purpleAccent],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          gradient: const LinearGradient(colors: [Colors.deepPurple, Colors.purpleAccent], begin: Alignment.topLeft, end: Alignment.bottomRight),
                           boxShadow: [
-                            BoxShadow(
-                              color: is3DMode 
-                                  ? Colors.purpleAccent.withOpacity(0.4) 
-                                  : Colors.black.withOpacity(0.3),
-                              blurRadius: is3DMode ? 40 : 20,
-                              spreadRadius: is3DMode ? 8 : 2,
-                            ),
+                            BoxShadow(color: is3DMode ? Colors.purpleAccent.withOpacity(0.4) : Colors.black.withOpacity(0.3), blurRadius: is3DMode ? 40 : 20, spreadRadius: is3DMode ? 8 : 2),
                           ],
                         ),
-                        child: Icon(
-                          isPlaying ? Icons.music_note_rounded : Icons.music_off_rounded,
-                          size: 75,
-                          color: Colors.white,
-                        ),
+                        child: Icon(isPlaying ? Icons.music_note_rounded : Icons.music_off_rounded, size: 75, color: Colors.white),
                       ),
                     );
                   },
                 ),
-                // Sleep Timer Indicator
                 if (_sleepTimerActive)
                   Positioned(
                     top: 0,
                     right: 0,
                     child: Container(
                       padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Colors.orange,
-                        shape: BoxShape.circle,
-                      ),
+                      decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle),
                       child: const Icon(Icons.timer, color: Colors.white, size: 16),
                     ),
                   ),
               ],
             ),
-            
             const SizedBox(height: 20),
-            
-            // MARQUEE SONG TITLE (Auto-scrolling)
             if (currentSongName.length > 30)
               SizedBox(
                 height: 30,
                 child: Marquee(
                   text: currentSongName,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.3,
-                  ),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.3),
                   scrollAxis: Axis.horizontal,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   blankSpace: 40,
@@ -1146,147 +957,56 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               Text(
                 currentSongName,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 0.3,
-                ),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.3),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-            
             const SizedBox(height: 5),
-            
-            Text(
-              hasSongs ? "Song ${_currentIndex + 1} of ${_playlist.length}" : "No songs",
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade400,
-              ),
-            ),
-            
+            Text(hasSongs ? "Song ${_currentIndex + 1} of ${_playlist.length}" : "No songs", style: TextStyle(fontSize: 13, color: Colors.grey.shade400)),
             const SizedBox(height: 16),
-            
-            // Audio Seek Slider
             Slider(
               activeColor: Colors.purpleAccent,
               inactiveColor: Colors.grey.shade800,
               min: 0.0,
-              max: _duration.inSeconds.toDouble() > 0 
-                  ? _duration.inSeconds.toDouble() 
-                  : 1.0,
-              value: _position.inSeconds.toDouble().clamp(
-                0.0, 
-                _duration.inSeconds.toDouble() > 0 
-                    ? _duration.inSeconds.toDouble() 
-                    : 1.0
-              ),
+              max: _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0,
+              value: _position.inSeconds.toDouble().clamp(0.0, _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0),
               onChanged: (value) async {
                 final position = Duration(seconds: value.toInt());
                 await _audioPlayer.seek(position);
                 setState(() => _position = position);
               },
             ),
-            
-            // Duration Timers
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    _formatDuration(_position),
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                  Text(
-                    _formatDuration(_duration),
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
+                  Text(_formatDuration(_position), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text(_formatDuration(_duration), style: const TextStyle(color: Colors.white70, fontSize: 12)),
                 ],
               ),
             ),
-            
             const SizedBox(height: 10),
-            
-            // Playback Controls
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      repeatMode == 1 
-                          ? Icons.repeat_one 
-                          : (repeatMode == 2 ? Icons.repeat : Icons.repeat_outlined),
-                      color: repeatMode > 0 ? Colors.purpleAccent : Colors.white54,
-                      size: 22,
-                    ),
-                    onPressed: () => setState(() => repeatMode = (repeatMode + 1) % 3),
-                  ),
-                  
-                  IconButton(
-                    icon: const Icon(Icons.skip_previous, color: Colors.white, size: 28),
-                    onPressed: hasSongs ? _playPreviousSong : null,
-                  ),
-                  
-                  IconButton(
-                    icon: const Icon(Icons.replay_10, color: Colors.white70, size: 24),
-                    onPressed: hasSongs ? () => _seekRelative(-10) : null,
-                  ),
-                  
+                  IconButton(icon: Icon(repeatMode == 1 ? Icons.repeat_one : (repeatMode == 2 ? Icons.repeat : Icons.repeat_outlined), color: repeatMode > 0 ? Colors.purpleAccent : Colors.white54, size: 22), onPressed: () => setState(() => repeatMode = (repeatMode + 1) % 3)),
+                  IconButton(icon: const Icon(Icons.skip_previous, color: Colors.white, size: 28), onPressed: hasSongs ? _playPreviousSong : null),
+                  IconButton(icon: const Icon(Icons.replay_10, color: Colors.white70, size: 24), onPressed: hasSongs ? () => _seekRelative(-10) : null),
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Colors.deepPurple, Colors.purpleAccent],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.purpleAccent.withOpacity(0.4),
-                          blurRadius: 15,
-                          spreadRadius: 3,
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        isPlaying ? Icons.pause : Icons.play_arrow,
-                        color: Colors.white,
-                      ),
-                      iconSize: 32,
-                      onPressed: _togglePlayPause,
-                      padding: const EdgeInsets.all(12),
-                    ),
+                    decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [Colors.deepPurple, Colors.purpleAccent]), boxShadow: [BoxShadow(color: Colors.purpleAccent.withOpacity(0.4), blurRadius: 15, spreadRadius: 3)]),
+                    child: IconButton(icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white), iconSize: 32, onPressed: _togglePlayPause, padding: const EdgeInsets.all(12)),
                   ),
-                  
-                  IconButton(
-                    icon: const Icon(Icons.forward_10, color: Colors.white70, size: 24),
-                    onPressed: hasSongs ? () => _seekRelative(10) : null,
-                  ),
-                  
-                  IconButton(
-                    icon: const Icon(Icons.skip_next, color: Colors.white, size: 28),
-                    onPressed: hasSongs ? _playNextSong : null,
-                  ),
-                  
-                  IconButton(
-                    icon: Icon(
-                      isShuffle ? Icons.shuffle : Icons.shuffle_outlined,
-                      color: isShuffle ? Colors.purpleAccent : Colors.white54,
-                      size: 22,
-                    ),
-                    onPressed: () => setState(() => isShuffle = !isShuffle),
-                  ),
+                  IconButton(icon: const Icon(Icons.forward_10, color: Colors.white70, size: 24), onPressed: hasSongs ? () => _seekRelative(10) : null),
+                  IconButton(icon: const Icon(Icons.skip_next, color: Colors.white, size: 28), onPressed: hasSongs ? _playNextSong : null),
+                  IconButton(icon: Icon(isShuffle ? Icons.shuffle : Icons.shuffle_outlined, color: isShuffle ? Colors.purpleAccent : Colors.white54, size: 22), onPressed: () => setState(() => isShuffle = !isShuffle)),
                 ],
               ),
             ),
-            
             const Spacer(flex: 1),
-            
-            // Bottom Action Controls
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: SingleChildScrollView(
@@ -1294,61 +1014,24 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildActionChip(
-                      icon: isCurrentFavorite ? Icons.favorite : Icons.favorite_border,
-                      label: isCurrentFavorite ? 'Favorite' : 'Add Fav',
-                      isActive: isCurrentFavorite,
-                      activeColor: Colors.red,
-                      onTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : null,
-                    ),
-                    
+                    _buildActionChip(icon: isCurrentFavorite ? Icons.favorite : Icons.favorite_border, label: isCurrentFavorite ? 'Favorite' : 'Add Fav', isActive: isCurrentFavorite, activeColor: Colors.red, onTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : null),
                     const SizedBox(width: 8),
-                    
-                    _buildActionChip(
-                      icon: Icons.spatial_audio,
-                      label: '3D',
-                      isActive: is3DMode,
-                      activeColor: Colors.purple,
-                      onTap: () async {
-                        setState(() => is3DMode = !is3DMode);
-                        if (is3DMode) {
-                          await _audioPlayer.setBalance(0.5);
-                          await _audioPlayer.setVolume(0.9);
-                        } else {
-                          await _audioPlayer.setBalance(0.0);
-                          await _audioPlayer.setVolume(_volume);
-                        }
-                      },
-                    ),
-                    
+                    _buildActionChip(icon: Icons.spatial_audio, label: '3D', isActive: is3DMode, activeColor: Colors.purple, onTap: () async {
+                      setState(() => is3DMode = !is3DMode);
+                      if (is3DMode) {
+                        await _audioPlayer.setBalance(0.5);
+                        await _audioPlayer.setVolume(0.9);
+                      } else {
+                        await _audioPlayer.setBalance(0.0);
+                        await _audioPlayer.setVolume(_volume);
+                      }
+                    }),
                     const SizedBox(width: 8),
-                    
-                    _buildActionChip(
-                      icon: Icons.volume_up,
-                      label: '${(_volume * 100).toInt()}%',
-                      isActive: false,
-                      onTap: () => _showVolumePopup(context),
-                    ),
-                    
+                    _buildActionChip(icon: Icons.volume_up, label: '${(_volume * 100).toInt()}%', isActive: false, onTap: () => _showVolumePopup(context)),
                     const SizedBox(width: 8),
-                    
-                    _buildActionChip(
-                      icon: Icons.equalizer,
-                      label: 'EQ',
-                      isActive: _currentEqPreset != 'Normal',
-                      activeColor: Colors.blue,
-                      onTap: () => _showEqualizerDialog(),
-                    ),
-                    
+                    _buildActionChip(icon: Icons.equalizer, label: 'EQ', isActive: _currentEqPreset != 'Normal', activeColor: Colors.blue, onTap: () => _showEqualizerDialog()),
                     const SizedBox(width: 8),
-                    
-                    _buildActionChip(
-                      icon: Icons.timer,
-                      label: _sleepTimerActive ? '${_sleepTimerMinutes}m' : 'Timer',
-                      isActive: _sleepTimerActive,
-                      activeColor: Colors.orange,
-                      onTap: () => _showSleepTimerDialog(),
-                    ),
+                    _buildActionChip(icon: Icons.timer, label: _sleepTimerActive ? '${_sleepTimerMinutes}m' : 'Timer', isActive: _sleepTimerActive, activeColor: Colors.orange, onTap: () => _showSleepTimerDialog()),
                   ],
                 ),
               ),
@@ -1359,44 +1042,22 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildActionChip({
-    required IconData icon,
-    required String label,
-    bool isActive = false,
-    Color activeColor = Colors.purple,
-    VoidCallback? onTap,
-  }) {
+  Widget _buildActionChip({required IconData icon, required String label, bool isActive = false, Color activeColor = Colors.purple, VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive 
-              ? activeColor.withOpacity(0.15) 
-              : Colors.grey.withOpacity(0.05),
+          color: isActive ? activeColor.withOpacity(0.15) : Colors.grey.withOpacity(0.05),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive ? activeColor : Colors.grey.shade700,
-            width: 1,
-          ),
+          border: Border.all(color: isActive ? activeColor : Colors.grey.shade700, width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isActive ? activeColor : Colors.white54,
-              size: 16,
-            ),
+            Icon(icon, color: isActive ? activeColor : Colors.white54, size: 16),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? activeColor : Colors.white54,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text(label, style: TextStyle(color: isActive ? activeColor : Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -1405,110 +1066,39 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   String _getAppBarTitle() {
     switch (_selectedIndex) {
-      case 1:
-        return 'Favorites ❤️';
-      case 2:
-        return 'Recent 🕐';
-      case 3:
-        return 'Device Music 📁';
-      case 4:
-        return 'Playlists 🎵';
-      default:
-        return 'My Music 3D';
+      case 1: return 'Favorites ❤️';
+      case 2: return 'Recent 🕐';
+      case 3: return 'Device Music 📁';
+      case 4: return 'Playlists 🎵';
+      default: return 'My Music 3D';
     }
   }
 
-  // ============================================================
-  // 11. BODY CONTENT
-  // ============================================================
   Widget _buildBodyContent() {
     switch (_selectedIndex) {
       case 1:
         return _favorites.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.favorite_border, size: 60, color: Colors.white24),
-                    SizedBox(height: 10),
-                    Text('No favorite songs yet', style: TextStyle(color: Colors.white54)),
-                    SizedBox(height: 5),
-                    Text('Tap ♡ on any song to add', style: TextStyle(color: Colors.white24, fontSize: 12)),
-                  ],
-                ),
-              )
-            : ListView.builder(
-                itemCount: _favorites.length,
-                itemBuilder: (context, index) {
-                  final song = _favorites[index];
-                  String cleanName = _cleanSongName(song.name);
-                  return ListTile(
-                    leading: const Icon(Icons.favorite, color: Colors.redAccent),
-                    title: Text(
-                      cleanName,
-                      style: const TextStyle(color: Colors.white),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white54, size: 18),
-                      onPressed: () {
-                        setState(() => _favorites.remove(song));
-                      },
-                    ),
-                    onTap: () => _playSpecificSong(song),
-                  );
-                },
-              );
-      
+            ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.favorite_border, size: 60, color: Colors.white24), SizedBox(height: 10), Text('No favorite songs yet', style: TextStyle(color: Colors.white54))]))
+            : ListView.builder(itemCount: _favorites.length, itemBuilder: (context, index) {
+                final song = _favorites[index];
+                return ListTile(leading: const Icon(Icons.favorite, color: Colors.redAccent), title: Text(_cleanSongName(song.name), style: const TextStyle(color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis), trailing: IconButton(icon: const Icon(Icons.close, color: Colors.white54), onPressed: () => setState(() => _favorites.remove(song))), onTap: () => _playSpecificSong(song));
+              });
       case 2:
         return _recent.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.history, size: 60, color: Colors.white24),
-                    SizedBox(height: 10),
-                    Text('No recent songs', style: TextStyle(color: Colors.white54)),
-                  ],
-                ),
-              )
-            : ListView.builder(
-                itemCount: _recent.length,
-                itemBuilder: (context, index) {
-                  final song = _recent[index];
-                  String cleanName = _cleanSongName(song.name);
-                  return ListTile(
-                    leading: const Icon(Icons.history, color: Colors.purpleAccent),
-                    title: Text(
-                      cleanName,
-                      style: const TextStyle(color: Colors.white),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Text(
-                      '${index + 1}',
-                      style: const TextStyle(color: Colors.white24, fontSize: 12),
-                    ),
-                    onTap: () => _playSpecificSong(song),
-                  );
-                },
-              );
-      
+            ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history, size: 60, color: Colors.white24), SizedBox(height: 10), Text('No recent songs', style: TextStyle(color: Colors.white54))]))
+            : ListView.builder(itemCount: _recent.length, itemBuilder: (context, index) {
+                final song = _recent[index];
+                return ListTile(leading: const Icon(Icons.history, color: Colors.purpleAccent), title: Text(_cleanSongName(song.name), style: const TextStyle(color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis), trailing: Text('${index + 1}', style: const TextStyle(color: Colors.white24, fontSize: 12)), onTap: () => _playSpecificSong(song));
+              });
       case 3:
         return _buildDeviceMusicTab();
-      
       case 4:
         return _buildCustomPlaylistsTab();
-      
       default:
         return _buildPlayerUI();
     }
   }
 
-  // ============================================================
-  // 12. MAIN BUILD
-  // ============================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1517,67 +1107,25 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         title: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_selectedIndex == 0) ...[
-              const Icon(Icons.music_note, color: Colors.purpleAccent, size: 22),
-              const SizedBox(width: 8),
-            ],
-            Text(
-              _getAppBarTitle(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
-            ),
+            if (_selectedIndex == 0) ...[const Icon(Icons.music_note, color: Colors.purpleAccent, size: 22), const SizedBox(width: 8)],
+            Text(_getAppBarTitle(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
           ],
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // Add Songs
-          IconButton(
-            icon: const Icon(Icons.add, color: Colors.white70),
-            onPressed: _pickSongs,
-            tooltip: 'Add Songs',
-          ),
-          // Queue
-          IconButton(
-            icon: const Icon(Icons.queue_music, color: Colors.white70),
-            onPressed: () => _showQueueBottomSheet(context),
-            tooltip: 'Queue',
-          ),
-          // More
+          IconButton(icon: const Icon(Icons.add, color: Colors.white70), onPressed: _pickSongs, tooltip: 'Add Songs'),
+          IconButton(icon: const Icon(Icons.queue_music, color: Colors.white70), onPressed: () => _showQueueBottomSheet(context), tooltip: 'Queue'),
           PopupMenuButton(
             icon: const Icon(Icons.more_vert, color: Colors.white70),
             color: const Color(0xFF1E293B),
             onSelected: (value) {
-              if (value == 'clear') {
-                _clearQueue();
-              } else if (value == 'scan') {
-                _scanDeviceMusic();
-              }
+              if (value == 'clear') _clearQueue();
+              else if (value == 'scan') _scanDeviceMusic();
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'scan',
-                child: Row(
-                  children: [
-                    Icon(Icons.refresh, color: Colors.blue, size: 20),
-                    SizedBox(width: 10),
-                    Text('Scan Device Music', style: TextStyle(color: Colors.white)),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'clear',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                    SizedBox(width: 10),
-                    Text('Clear Queue', style: TextStyle(color: Colors.white)),
-                  ],
-                ),
-              ),
+              const PopupMenuItem(value: 'scan', child: Row(children: [Icon(Icons.refresh, color: Colors.blue, size: 20), SizedBox(width: 10), Text('Scan Device Music', style: TextStyle(color: Colors.white))])),
+              const PopupMenuItem(value: 'clear', child: Row(children: [Icon(Icons.delete_outline, color: Colors.red, size: 20), SizedBox(width: 10), Text('Clear Queue', style: TextStyle(color: Colors.white))])),
             ],
           ),
         ],
@@ -1590,30 +1138,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         unselectedItemColor: Colors.white54,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        onTap: (index) {
-          setState(() => _selectedIndex = index);
-        },
+        onTap: (index) => setState(() => _selectedIndex = index),
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.play_circle_filled),
-            label: 'Player',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
-            label: 'Favorites',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'Recent',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.music_note),
-            label: 'Device',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.playlist_play),
-            label: 'Playlists',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.play_circle_filled), label: 'Player'),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favorites'),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Recent'),
+          BottomNavigationBarItem(icon: Icon(Icons.music_note), label: 'Device'),
+          BottomNavigationBarItem(icon: Icon(Icons.playlist_play), label: 'Playlists'),
         ],
       ),
     );
