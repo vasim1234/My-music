@@ -52,6 +52,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       await _audioPlayer.stop();
       await _audioPlayer.play(DeviceFileSource(filePath));
       await _audioPlayer.setVolume(_volume); // Set current volume
+      
+      // Agar 3D mode pehle se on hai toh play hone par bhi balance set rahe
+      if (is3DMode) {
+        await _audioPlayer.setBalance(0.5);
+      }
 
       setState(() {
         currentFileName = fileName;
@@ -86,11 +91,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0F172A), // Dark music player theme background
       appBar: AppBar(
-        title: const Text('My Music 3D'),
+        title: const Text('My Music 3D', style: TextStyle(color: Colors.white)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView( // Scrollable banaya hai taaki screen choti na pade
         padding: const EdgeInsets.all(20.0),
@@ -98,19 +105,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const SizedBox(height: 10),
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
               height: 160,
               width: 160,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
                   colors: [Colors.deepPurple, Colors.purpleAccent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.deepPurpleAccent.withOpacity(0.5),
-                    blurRadius: is3DMode ? 35 : 12,
-                    spreadRadius: is3DMode ? 8 : 2,
+                    color: is3DMode ? Colors.purpleAccent.withOpacity(0.8) : Colors.deepPurpleAccent.withOpacity(0.4),
+                    blurRadius: is3DMode ? 45 : 12,
+                    spreadRadius: is3DMode ? 12 : 2,
                   ),
                 ],
               ),
@@ -120,17 +130,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
             Text(
               currentFileName,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 10),
             SwitchListTile(
-              title: const Text('3D Sound Effect', style: TextStyle(fontSize: 14)),
+              title: const Text('3D Sound Effect (Spatial/Stereo)', style: TextStyle(fontSize: 14, color: Colors.white)),
               value: is3DMode,
               activeColor: Colors.purpleAccent,
-              onChanged: (val) {
+              onChanged: (val) async {
                 setState(() => is3DMode = val);
+                if (is3DMode) {
+                  await _audioPlayer.setBalance(0.5); // Shifts sound to give spatial 3D feel
+                  await _audioPlayer.setVolume(0.9);
+                } else {
+                  await _audioPlayer.setBalance(0.0); // Reset to normal stereo center
+                  await _audioPlayer.setVolume(_volume);
+                }
               },
             ),
             // Seek Bar
@@ -205,7 +222,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         setState(() {
                           _volume = val;
                         });
-                        await _audioPlayer.setVolume(_volume);
+                        if (!is3DMode) {
+                          await _audioPlayer.setVolume(_volume);
+                        }
                       },
                     ),
                   ),
