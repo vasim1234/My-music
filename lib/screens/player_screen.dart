@@ -19,7 +19,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   bool isShuffle = false;
   int repeatMode = 0;
   
-  final List<PlatformFile> _playlist = [];
+  List<PlatformFile> _playlist = [];
   final List<PlatformFile> _favorites = [];
   final List<PlatformFile> _recent = [];
   int _currentIndex = 0;
@@ -33,15 +33,22 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   // Helper function to clean song name
   String _cleanSongName(String fileName) {
+    // Remove extension
     String name = fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
+    
+    // Remove (MP3_320K), (320K), etc.
     name = name.replaceAll(RegExp(r'\(\w*_\d+K\)', caseSensitive: false), '');
     name = name.replaceAll(RegExp(r'\(\d+K\)', caseSensitive: false), '');
     name = name.replaceAll(RegExp(r'\(MP3_\d+K\)', caseSensitive: false), '');
+    
+    // Remove extra spaces
     name = name.trim();
     
-    if (name.length > 35) {
-      name = '${name.substring(0, 35)}...';
+    // If name is too long, truncate clean
+    if (name.length > 40) {
+      name = '${name.substring(0, 40)}...';
     }
+    
     return name;
   }
 
@@ -583,7 +590,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       );
     }
 
-    // Player Tab
+    // Player Tab (Main Screen)
     String currentSongName = _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].name) : "No song selected";
     bool isCurrentFavorite = _playlist.isNotEmpty && _favorites.contains(_playlist[_currentIndex]);
     bool hasSongs = _playlist.isNotEmpty;
@@ -595,6 +602,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Spacer(flex: 1),
+            
+            // Album Art Container with Pulsing Animation
             Center(
               child: AnimatedBuilder(
                 animation: _pulseAnimation,
@@ -602,8 +611,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   return Transform.scale(
                     scale: isPlaying ? _pulseAnimation.value : 1.0,
                     child: Container(
-                      height: 180,
-                      width: 180,
+                      height: 190,
+                      width: 190,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
@@ -631,12 +640,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 },
               ),
             ),
-            const SizedBox(height: 20),
+            
+            const SizedBox(height: 25),
+            
+            // Clean & Truncated Song Name
             Text(
               currentSongName,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 17,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 letterSpacing: 0.3,
@@ -644,7 +656,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+            
             const SizedBox(height: 5),
+            
             Text(
               hasSongs ? "Song ${_currentIndex + 1} of ${_playlist.length}" : "No songs",
               style: TextStyle(
@@ -652,7 +666,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 color: Colors.grey.shade400,
               ),
             ),
-            const SizedBox(height: 15),
+            
+            const SizedBox(height: 20),
+            
+            // Audio Seek Slider
             Slider(
               activeColor: Colors.purpleAccent,
               inactiveColor: Colors.grey.shade800,
@@ -672,6 +689,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 setState(() => _position = position);
               },
             ),
+            
+            // Duration Timers
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: Row(
@@ -688,72 +707,87 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    repeatMode == 1 
-                        ? Icons.repeat_one 
-                        : (repeatMode == 2 ? Icons.repeat : Icons.repeat_outlined),
-                    color: repeatMode > 0 ? Colors.purpleAccent : Colors.white54,
-                    size: 22,
-                  ),
-                  onPressed: () => setState(() => repeatMode = (repeatMode + 1) % 3),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 28),
-                  onPressed: hasSongs ? _playPreviousSong : null,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.replay_10, color: Colors.white70, size: 24),
-                  onPressed: hasSongs ? () => _seekRelative(-10) : null,
-                ),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Colors.deepPurple, Colors.purpleAccent],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.purpleAccent.withOpacity(0.4),
-                        blurRadius: 15,
-                        spreadRadius: 3,
-                      ),
-                    ],
-                  ),
-                  child: IconButton(
+            
+            const SizedBox(height: 12),
+            
+            // Playback Controls wrapped in FittedBox to PREVENT OVERFLOW
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
                     icon: Icon(
-                      isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
+                      repeatMode == 1 
+                          ? Icons.repeat_one 
+                          : (repeatMode == 2 ? Icons.repeat : Icons.repeat_outlined),
+                      color: repeatMode > 0 ? Colors.purpleAccent : Colors.white54,
+                      size: 22,
                     ),
-                    iconSize: 32,
-                    onPressed: _togglePlayPause,
-                    padding: const EdgeInsets.all(12),
+                    onPressed: () => setState(() => repeatMode = (repeatMode + 1) % 3),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.forward_10, color: Colors.white70, size: 24),
-                  onPressed: hasSongs ? () => _seekRelative(10) : null,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 28),
-                  onPressed: hasSongs ? _playNextSong : null,
-                ),
-                IconButton(
-                  icon: Icon(
-                    isShuffle ? Icons.shuffle : Icons.shuffle_outlined,
-                    color: isShuffle ? Colors.purpleAccent : Colors.white54,
-                    size: 22,
+                  
+                  IconButton(
+                    icon: const Icon(Icons.skip_previous, color: Colors.white, size: 28),
+                    onPressed: hasSongs ? _playPreviousSong : null,
                   ),
-                  onPressed: () => setState(() => isShuffle = !isShuffle),
-                ),
-              ],
+                  
+                  IconButton(
+                    icon: const Icon(Icons.replay_10, color: Colors.white70, size: 24),
+                    onPressed: hasSongs ? () => _seekRelative(-10) : null,
+                  ),
+                  
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Colors.deepPurple, Colors.purpleAccent],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.purpleAccent.withOpacity(0.4),
+                          blurRadius: 15,
+                          spreadRadius: 3,
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.white,
+                      ),
+                      iconSize: 32,
+                      onPressed: _togglePlayPause,
+                      padding: const EdgeInsets.all(12),
+                    ),
+                  ),
+                  
+                  IconButton(
+                    icon: const Icon(Icons.forward_10, color: Colors.white70, size: 24),
+                    onPressed: hasSongs ? () => _seekRelative(10) : null,
+                  ),
+                  
+                  IconButton(
+                    icon: const Icon(Icons.skip_next, color: Colors.white, size: 28),
+                    onPressed: hasSongs ? _playNextSong : null,
+                  ),
+                  
+                  IconButton(
+                    icon: Icon(
+                      isShuffle ? Icons.shuffle : Icons.shuffle_outlined,
+                      color: isShuffle ? Colors.purpleAccent : Colors.white54,
+                      size: 22,
+                    ),
+                    onPressed: () => setState(() => isShuffle = !isShuffle),
+                  ),
+                ],
+              ),
             ),
+            
             const Spacer(flex: 1),
+            
+            // Bottom Action Controls (Favorite, 3D Mode, Volume)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
@@ -793,7 +827,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       ),
                     ),
                   ),
+                  
                   const SizedBox(width: 10),
+                  
                   GestureDetector(
                     onTap: () async {
                       setState(() => is3DMode = !is3DMode);
@@ -838,7 +874,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       ),
                     ),
                   ),
+                  
                   const SizedBox(width: 10),
+                  
                   GestureDetector(
                     onTap: () => _showVolumePopup(context),
                     child: Container(
