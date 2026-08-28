@@ -127,7 +127,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.between,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     'Playback Queue',
@@ -198,7 +198,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // Queue dekhne ke liye AppBar mein button
           IconButton(
             icon: const Icon(Icons.queue_music, color: Colors.white),
             onPressed: () => _showQueueBottomSheet(context),
@@ -211,7 +210,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Center Album Art Card
             Expanded(
               child: Center(
                 child: AnimatedContainer(
@@ -272,7 +270,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
             const SizedBox(height: 15),
 
-            // 3D Sound Switch Card
             Card(
               color: const Color(0xFF1E293B),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -294,7 +291,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
             const SizedBox(height: 10),
 
-            // Seek Bar
             Slider(
               activeColor: Colors.purpleAccent,
               inactiveColor: Colors.grey.shade800,
@@ -319,7 +315,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
             const SizedBox(height: 10),
             
-            // Player Controls
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -354,7 +349,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
             const SizedBox(height: 15),
 
-            // Volume Slider Card
             Card(
               color: const Color(0xFF1E293B),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -385,7 +379,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
             const SizedBox(height: 15),
 
-            // Add Songs Button
             ElevatedButton.icon(
               onPressed: _pickSongs,
               icon: const Icon(Icons.playlist_add),
