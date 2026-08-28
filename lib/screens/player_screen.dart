@@ -17,6 +17,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
+  double _volume = 1.0; // Volume ke liye state variable (0.0 se 1.0)
 
   @override
   void initState() {
@@ -50,6 +51,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
       await _audioPlayer.stop();
       await _audioPlayer.play(DeviceFileSource(filePath));
+      await _audioPlayer.setVolume(_volume); // Set current volume
 
       setState(() {
         currentFileName = fileName;
@@ -68,6 +70,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  // 10 seconds aage ya piche karne ke liye function
+  Future<void> _seekRelative(int seconds) async {
+    final newPosition = _position + Duration(seconds: seconds);
+    await _audioPlayer.seek(newPosition);
+  }
+
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final minutes = twoDigits(duration.inMinutes.remainder(60));
@@ -84,14 +92,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: Padding(
+      body: SingleChildScrollView( // Scrollable banaya hai taaki screen choti na pade
         padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const SizedBox(height: 10),
             Container(
-              height: 180,
-              width: 180,
+              height: 160,
+              width: 160,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
@@ -105,24 +114,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.headphones_rounded, size: 80, color: Colors.white),
+              child: const Icon(Icons.headphones_rounded, size: 70, color: Colors.white),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
             Text(
               currentFileName,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             SwitchListTile(
-              title: const Text('3D Sound Effect'),
+              title: const Text('3D Sound Effect', style: TextStyle(fontSize: 14)),
               value: is3DMode,
               activeColor: Colors.purpleAccent,
               onChanged: (val) {
                 setState(() => is3DMode = val);
               },
             ),
-            const SizedBox(height: 10),
+            // Seek Bar
             Slider(
               activeColor: Colors.purpleAccent,
               inactiveColor: Colors.grey.shade800,
@@ -147,27 +158,72 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 15),
+            
+            // Skip & Rewind Buttons (-10s aur +10s)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ElevatedButton.icon(
-                  onPressed: _pickAndPlayAudio,
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('Open Song'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800]),
+                IconButton(
+                  icon: const Icon(Icons.replay_10, color: Colors.white70, size: 28),
+                  onPressed: () => _seekRelative(-10),
                 ),
                 const SizedBox(width: 20),
+                // Play / Pause Button
                 CircleAvatar(
-                  radius: 30,
+                  radius: 28,
                   backgroundColor: Colors.deepPurpleAccent,
                   child: IconButton(
                     icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
-                    iconSize: 32,
+                    iconSize: 30,
                     onPressed: _togglePlayPause,
                   ),
                 ),
+                const SizedBox(width: 20),
+                IconButton(
+                  icon: const Icon(Icons.forward_10, color: Colors.white70, size: 28),
+                  onPressed: () => _seekRelative(10),
+                ),
               ],
+            ),
+            const SizedBox(height: 15),
+
+            // Volume Slider Row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.volume_down, color: Colors.white70, size: 20),
+                  Expanded(
+                    child: Slider(
+                      activeColor: Colors.purpleAccent,
+                      inactiveColor: Colors.grey.shade800,
+                      min: 0.0,
+                      max: 1.0,
+                      value: _volume,
+                      onChanged: (val) async {
+                        setState(() {
+                          _volume = val;
+                        });
+                        await _audioPlayer.setVolume(_volume);
+                      },
+                    ),
+                  ),
+                  const Icon(Icons.volume_up, color: Colors.white70, size: 20),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+
+            // Open Song Button
+            ElevatedButton.icon(
+              onPressed: _pickAndPlayAudio,
+              icon: const Icon(Icons.folder_open),
+              label: const Text('Open Song'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey[800],
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
         ),
