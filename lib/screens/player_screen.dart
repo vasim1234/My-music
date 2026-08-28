@@ -15,6 +15,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
   String currentFileName = "No song selected";
   bool is3DMode = false;
 
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer.onDurationChanged.listen((newDuration) {
+      setState(() {
+        _duration = newDuration;
+      });
+    });
+    _audioPlayer.onPositionChanged.listen((newPosition) {
+      setState(() {
+        _position = newPosition;
+      });
+    });
+  }
+
   @override
   void dispose() {
     _audioPlayer.dispose();
@@ -48,6 +66,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
       await _audioPlayer.resume();
       setState(() => isPlaying = true);
     }
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$minutes:$seconds";
   }
 
   @override
@@ -97,7 +122,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 setState(() => is3DMode = val);
               },
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 10),
+            Slider(
+              activeColor: Colors.purpleAccent,
+              inactiveColor: Colors.grey.shade800,
+              min: 0.0,
+              max: _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0,
+              value: _position.inSeconds.toDouble().clamp(0.0, _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0),
+              onChanged: (value) async {
+                final position = Duration(seconds: value.toInt());
+                await _audioPlayer.seek(position);
+                setState(() {
+                  _position = position;
+                });
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(_formatDuration(_position), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text(_formatDuration(_duration), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -125,4 +175,3 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 }
-
