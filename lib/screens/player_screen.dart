@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:audio_eq/audio_eq.dart'; // ← REAL EQ
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -44,40 +45,39 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   final Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
 
-  // ===== EQUALIZER =====
+  // ===== REAL EQUALIZER =====
+  late Equalizer _equalizer;
+  bool _isEqInitialized = false;
   String _currentEqPreset = 'Normal';
-  final Map<String, double> _eqValues = {
-    'bass': 0.0,
-    'treble': 0.0,
-    'mid': 0.0,
-    'lowMid': 0.0,
-    'highMid': 0.0,
+  
+  // EQ Bands - 10 Band Equalizer
+  final List<String> _bandLabels = [
+    '31Hz', '62Hz', '125Hz', '250Hz', '500Hz',
+    '1kHz', '2kHz', '4kHz', '8kHz', '16kHz'
+  ];
+  
+  // Default EQ values (0 = flat)
+  final Map<String, List<double>> _eqPresets = {
+    'Normal': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    'Bass Boost': [6, 5, 4, 2, 0, -1, -2, -2, -1, 0],
+    'Treble Boost': [0, -1, -2, -1, 0, 2, 4, 5, 6, 6],
+    'Pop': [2, 3, 2, 1, 0, 1, 2, 3, 2, 1],
+    'Rock': [4, 3, 2, 1, 0, 1, 2, 3, 4, 5],
+    'Classical': [-1, -1, 0, 0, 1, 2, 3, 4, 5, 4],
+    'Jazz': [3, 4, 3, 2, 0, 1, 2, 3, 4, 3],
+    'Vocal': [0, 0, 1, 2, 3, 2, 1, 0, 0, 0],
+    'Hip Hop': [4, 5, 4, 2, 0, -1, -1, 0, 1, 2],
+    'Electronic': [3, 4, 3, 2, 0, 1, 2, 3, 4, 5],
   };
   
-  final Map<String, Map<String, double>> _eqPresets = {
-    'Normal': {'bass': 0.0, 'treble': 0.0, 'mid': 0.0, 'lowMid': 0.0, 'highMid': 0.0},
-    'Bass Boost': {'bass': 0.8, 'treble': -0.2, 'mid': 0.0, 'lowMid': 0.4, 'highMid': -0.2},
-    'Treble Boost': {'bass': -0.2, 'treble': 0.8, 'mid': 0.0, 'lowMid': -0.2, 'highMid': 0.4},
-    'Pop': {'bass': 0.3, 'treble': 0.4, 'mid': 0.0, 'lowMid': 0.2, 'highMid': 0.2},
-    'Rock': {'bass': 0.5, 'treble': 0.3, 'mid': 0.2, 'lowMid': 0.3, 'highMid': 0.3},
-    'Classical': {'bass': -0.3, 'treble': 0.6, 'mid': 0.1, 'lowMid': -0.1, 'highMid': 0.5},
-    'Jazz': {'bass': 0.4, 'treble': -0.1, 'mid': 0.2, 'lowMid': 0.3, 'highMid': 0.0},
-  };
+  List<double> _currentEqValues = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  bool _isEqActive = false;
 
-  // ===== SONG COLORS FOR ALBUM ART =====
+  // Song Colors
   final List<Color> _albumColors = [
-    Colors.purple,
-    Colors.blue,
-    Colors.green,
-    Colors.orange,
-    Colors.red,
-    Colors.pink,
-    Colors.cyan,
-    Colors.teal,
-    Colors.indigo,
-    Colors.deepPurple,
-    Colors.amber,
-    Colors.lime,
+    Colors.purple, Colors.blue, Colors.green, Colors.orange, Colors.red,
+    Colors.pink, Colors.cyan, Colors.teal, Colors.indigo, Colors.deepPurple,
+    Colors.amber, Colors.lime,
   ];
 
   Color _getSongColor(int index) {
@@ -109,6 +109,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    // Initialize Equalizer
+    _initializeEqualizer();
+
     _audioPlayer.onDurationChanged.listen((newDuration) {
       if (mounted) setState(() => _duration = newDuration);
     });
@@ -127,56 +130,58 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     _pulseController.dispose();
     _audioPlayer.dispose();
     _sleepTimer?.cancel();
+    _equalizer.dispose();
     super.dispose();
   }
 
-  void _handleSongCompletion() {
-    if (repeatMode == 1) {
-      _playCurrentSongInQueue();
-    } else if (repeatMode == 2) {
-      _playNextSong();
-    } else {
-      if (_currentIndex < _playlist.length - 1) {
-        _playNextSong();
-      } else {
-        if (mounted) setState(() => isPlaying = false);
-      }
+  // ===== INITIALIZE EQUALIZER =====
+  Future<void> _initializeEqualizer() async {
+    try {
+      _equalizer = Equalizer();
+      _isEqInitialized = true;
+      // Set default flat EQ
+      await _equalizer.setBands(_currentEqValues);
+    } catch (e) {
+      debugPrint('Equalizer init error: $e');
     }
   }
 
-  // ===== EQUALIZER FUNCTIONS =====
-  void _applyEqualizer() {
-    double bassBoost = _eqValues['bass']!;
-    double trebleBoost = _eqValues['treble']!;
-    double balance = (trebleBoost - bassBoost).clamp(-1.0, 1.0) * 0.3;
-    double volumeMultiplier = 1.0 + (bassBoost + trebleBoost) * 0.1;
-    _audioPlayer.setBalance(balance.clamp(-1.0, 1.0));
-    _audioPlayer.setVolume((_volume * volumeMultiplier).clamp(0.0, 1.0));
+  // ===== APPLY EQUALIZER =====
+  Future<void> _applyEqualizer() async {
+    if (!_isEqInitialized) return;
+    try {
+      await _equalizer.setBands(_currentEqValues);
+      setState(() => _isEqActive = true);
+    } catch (e) {
+      debugPrint('EQ apply error: $e');
+    }
   }
 
-  void _resetEqualizer() {
+  // ===== RESET EQUALIZER =====
+  Future<void> _resetEqualizer() async {
     setState(() {
       _currentEqPreset = 'Normal';
-      _eqValues['bass'] = 0.0;
-      _eqValues['treble'] = 0.0;
-      _eqValues['mid'] = 0.0;
-      _eqValues['lowMid'] = 0.0;
-      _eqValues['highMid'] = 0.0;
+      _currentEqValues = List.filled(10, 0);
+      _isEqActive = false;
     });
-    _applyEqualizer();
+    await _applyEqualizer();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Equalizer reset to Normal'),
+        backgroundColor: Colors.grey,
+        duration: Duration(seconds: 1),
+      ),
+    );
   }
 
-  void _applyPreset(String presetName) {
+  // ===== APPLY PRESET =====
+  Future<void> _applyPreset(String presetName) async {
     setState(() {
       _currentEqPreset = presetName;
-      final preset = _eqPresets[presetName]!;
-      _eqValues['bass'] = preset['bass']!;
-      _eqValues['treble'] = preset['treble']!;
-      _eqValues['mid'] = preset['mid']!;
-      _eqValues['lowMid'] = preset['lowMid']!;
-      _eqValues['highMid'] = preset['highMid']!;
+      _currentEqValues = List.from(_eqPresets[presetName]!);
+      _isEqActive = presetName != 'Normal';
     });
-    _applyEqualizer();
+    await _applyEqualizer();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('🎵 $presetName preset applied'),
@@ -186,6 +191,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
+  // ===== EQ DIALOG =====
   void _showEqualizerDialog() {
     showModalBottomSheet(
       context: context,
@@ -199,10 +205,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           builder: (context, setModalState) {
             return Container(
               padding: const EdgeInsets.all(20),
-              height: MediaQuery.of(context).size.height * 0.75,
+              height: MediaQuery.of(context).size.height * 0.85,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -210,16 +217,23 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         children: [
                           const Icon(Icons.equalizer, color: Colors.purpleAccent, size: 28),
                           const SizedBox(width: 10),
-                          const Text('Equalizer', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                          const SizedBox(width: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.purpleAccent.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(_currentEqPreset, style: const TextStyle(color: Colors.purpleAccent, fontSize: 11)),
+                          const Text(
+                            'Equalizer',
+                            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                           ),
+                          const SizedBox(width: 10),
+                          if (_isEqActive)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'ON',
+                                style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
                         ],
                       ),
                       Row(
@@ -240,9 +254,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       ),
                     ],
                   ),
+                  
                   const SizedBox(height: 10),
                   const Divider(color: Colors.white24),
-                  const Text('PRESETS', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                  
+                  // Presets
+                  const Text(
+                    'PRESETS',
+                    style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -250,11 +270,20 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     children: _eqPresets.keys.map((preset) {
                       bool isSelected = _currentEqPreset == preset;
                       return FilterChip(
-                        label: Text(preset, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 12)),
+                        label: Text(
+                          preset,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontSize: 11,
+                          ),
+                        ),
                         selected: isSelected,
                         selectedColor: Colors.purpleAccent.withOpacity(0.3),
                         backgroundColor: Colors.grey.shade800,
-                        side: BorderSide(color: isSelected ? Colors.purpleAccent : Colors.grey.shade700, width: 1.5),
+                        side: BorderSide(
+                          color: isSelected ? Colors.purpleAccent : Colors.grey.shade700,
+                          width: 1.5,
+                        ),
                         onSelected: (selected) {
                           if (selected) {
                             _applyPreset(preset);
@@ -264,20 +293,66 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       );
                     }).toList(),
                   ),
+                  
                   const SizedBox(height: 16),
                   const Divider(color: Colors.white24),
-                  const Text('CUSTOM EQ', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                  
+                  // EQ Sliders - 10 Band
+                  const Text(
+                    '10 BAND EQUALIZER',
+                    style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 8),
+                  
                   Expanded(
-                    child: ListView(
-                      children: [
-                        _buildEqSlider('Bass', 'bass', Colors.blue, setModalState),
-                        _buildEqSlider('Low Mid', 'lowMid', Colors.cyan, setModalState),
-                        _buildEqSlider('Mid', 'mid', Colors.green, setModalState),
-                        _buildEqSlider('High Mid', 'highMid', Colors.orange, setModalState),
-                        _buildEqSlider('Treble', 'treble', Colors.red, setModalState),
-                      ],
+                    child: ListView.builder(
+                      itemCount: 10,
+                      itemBuilder: (context, index) {
+                        return _buildEqSlider(
+                          label: _bandLabels[index],
+                          index: index,
+                          value: _currentEqValues[index],
+                          color: _getSliderColor(index),
+                          onChanged: (value) {
+                            setState(() {
+                              _currentEqValues[index] = value;
+                              _currentEqPreset = 'Custom';
+                              _isEqActive = true;
+                            });
+                            setModalState(() {});
+                            _applyEqualizer();
+                          },
+                        );
+                      },
                     ),
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  // EQ Toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Equalizer',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                      Switch(
+                        value: _isEqActive,
+                        activeColor: Colors.purpleAccent,
+                        onChanged: (value) async {
+                          setState(() {
+                            _isEqActive = value;
+                            if (!value) {
+                              _currentEqValues = List.filled(10, 0);
+                              _currentEqPreset = 'Normal';
+                            }
+                          });
+                          await _applyEqualizer();
+                          setModalState(() {});
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -288,7 +363,29 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildEqSlider(String label, String key, Color color, Function setModalState) {
+  Color _getSliderColor(int index) {
+    final colors = [
+      Colors.red,
+      Colors.orange,
+      Colors.amber,
+      Colors.yellow,
+      Colors.lime,
+      Colors.green,
+      Colors.cyan,
+      Colors.blue,
+      Colors.indigo,
+      Colors.purple,
+    ];
+    return colors[index % colors.length];
+  }
+
+  Widget _buildEqSlider({
+    required String label,
+    required int index,
+    required double value,
+    required Color color,
+    required Function(double) onChanged,
+  }) {
     return Column(
       children: [
         Row(
@@ -296,32 +393,41 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           children: [
             Row(
               children: [
-                Icon(Icons.music_note, color: color, size: 16),
+                Container(
+                  width: 40,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    label,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ),
                 const SizedBox(width: 8),
-                Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                Expanded(
+                  child: Slider(
+                    value: value,
+                    min: -10,
+                    max: 10,
+                    activeColor: color,
+                    inactiveColor: Colors.grey.shade800,
+                    onChanged: onChanged,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 30,
+                  alignment: Alignment.center,
+                  child: Text(
+                    value > 0 ? '+${value.toInt()}' : '${value.toInt()}',
+                    style: TextStyle(
+                      color: value == 0 ? Colors.white54 : color,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ],
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-              child: Text('${(_eqValues[key]! * 10).toInt()} dB', style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
-            ),
           ],
-        ),
-        Slider(
-          value: _eqValues[key]!,
-          min: -1.0,
-          max: 1.0,
-          activeColor: color,
-          inactiveColor: Colors.grey.shade800,
-          onChanged: (value) {
-            setState(() {
-              _eqValues[key] = value;
-              _currentEqPreset = 'Custom';
-            });
-            setModalState(() {});
-            _applyEqualizer();
-          },
         ),
       ],
     );
@@ -536,7 +642,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         await _audioPlayer.play(DeviceFileSource(currentFile.path!));
         await _audioPlayer.setVolume(_volume);
         await _audioPlayer.setBalance(is3DMode ? 0.5 : 0.0);
-        _applyEqualizer();
+        // Apply EQ when song starts
+        if (_isEqActive) {
+          await _applyEqualizer();
+        }
         if (mounted) setState(() => isPlaying = true);
       }
     } catch (e) {
@@ -651,10 +760,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isActive ? activeColor.withOpacity(0.15) : Colors.grey.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: isActive ? activeColor : Colors.grey.shade700, width: 1),
         ),
         child: Row(
@@ -808,12 +917,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ===== PLAYER UI - NEW LAYOUT =====
+  // ===== PLAYER UI =====
   Widget _buildPlayerUI() {
     String currentSongName = _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].name) : "No song selected";
     bool isCurrentFavorite = _playlist.isNotEmpty && _favorites.contains(_playlist[_currentIndex]);
     bool hasSongs = _playlist.isNotEmpty;
-    bool isEqActive = _currentEqPreset != 'Normal';
     Color currentColor = hasSongs ? _getSongColor(_currentIndex) : Colors.purple;
 
     return SafeArea(
@@ -824,7 +932,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           children: [
             const Spacer(flex: 1),
             
-            // ===== TOP ROW: FAVORITE & EQ CHIPS (Arrow wali jagah) =====
+            // ===== TOP ROW: FAVORITE & EQ =====
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -869,10 +977,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isEqActive ? Colors.blue.withOpacity(0.15) : Colors.grey.withOpacity(0.1),
+                      color: _isEqActive ? Colors.blue.withOpacity(0.15) : Colors.grey.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isEqActive ? Colors.blue : Colors.grey.shade700,
+                        color: _isEqActive ? Colors.blue : Colors.grey.shade700,
                         width: 1,
                       ),
                     ),
@@ -881,14 +989,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       children: [
                         Icon(
                           Icons.equalizer,
-                          color: isEqActive ? Colors.blue : Colors.white54,
+                          color: _isEqActive ? Colors.blue : Colors.white54,
                           size: 18,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          isEqActive ? _currentEqPreset : 'EQ',
+                          _isEqActive ? _currentEqPreset : 'EQ',
                           style: TextStyle(
-                            color: isEqActive ? Colors.blue : Colors.white54,
+                            color: _isEqActive ? Colors.blue : Colors.white54,
                             fontSize: 12,
                           ),
                         ),
@@ -901,7 +1009,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             
             const SizedBox(height: 16),
             
-            // ===== ALBUM ART with Song Color =====
+            // ===== ALBUM ART =====
             AnimatedBuilder(
               animation: _pulseController,
               builder: (context, child) {
@@ -945,7 +1053,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 ),
                         ),
                       ),
-                      // Sleep Timer Indicator
                       if (_sleepTimerActive)
                         Positioned(
                           top: 0,
@@ -959,7 +1066,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             child: const Icon(Icons.timer, color: Colors.white, size: 16),
                           ),
                         ),
-                      // Play Indicator
                       if (isPlaying)
                         Positioned(
                           bottom: 10,
@@ -1098,7 +1204,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 3D
                   _buildActionChip(
                     icon: Icons.spatial_audio,
                     label: '3D',
@@ -1118,7 +1223,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   
                   const SizedBox(width: 8),
                   
-                  // Volume
                   _buildActionChip(
                     icon: Icons.volume_up,
                     label: '${(_volume * 100).toInt()}%',
@@ -1128,7 +1232,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   
                   const SizedBox(width: 8),
                   
-                  // Timer
                   _buildActionChip(
                     icon: Icons.timer,
                     label: _sleepTimerActive ? '${_sleepTimerMinutes}m' : 'Timer',
@@ -1176,7 +1279,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             setModalState(() => _volume = value);
                             setState(() => _volume = value);
                             await _audioPlayer.setVolume(value);
-                            _applyEqualizer();
                           },
                         ),
                       ),
@@ -1360,9 +1462,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 _clearQueue();
               } else if (value == 'reset_eq') {
                 _resetEqualizer();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Equalizer reset to Normal'), backgroundColor: Colors.grey),
-                );
               }
             },
             itemBuilder: (context) => [
