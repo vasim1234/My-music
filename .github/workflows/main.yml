@@ -26,25 +26,26 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Backup and Recreate Android
+        run: |
+          # Delete old android folder
+          rm -rf android
+          
+          # Create fresh Flutter project with android
+          flutter create --platforms=android --project-name=my_music --org=com.music.app .
+          
+          # Restore lib folder (if overwritten)
+          # Your lib files are already in repo, so they'll stay
+
       - name: Fix Android SDK version
         run: |
-          # Update build.gradle to use SDK 33 instead of 35
-          if [ -f "android/app/build.gradle" ]; then
-            sed -i 's/compileSdkVersion 35/compileSdkVersion 33/g' android/app/build.gradle
-            sed -i 's/targetSdkVersion 35/targetSdkVersion 33/g' android/app/build.gradle
-          fi
+          # Update build.gradle to use SDK 33
+          sed -i 's/compileSdkVersion 35/compileSdkVersion 33/g' android/app/build.gradle
+          sed -i 's/targetSdkVersion 35/targetSdkVersion 33/g' android/app/build.gradle
           
-          # Update gradle.properties
-          if [ -f "android/gradle.properties" ]; then
-            echo "android.useAndroidX=true" >> android/gradle.properties
-            echo "android.enableJetifier=true" >> android/gradle.properties
-          fi
-
-      - name: Create Android folder if missing
-        run: |
-          if [ ! -d "android" ]; then
-            flutter create --platforms=android --project-name=my_music --org=com.music.app .
-          fi
+          # Add gradle properties
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
 
       - name: Install dependencies
         run: |
@@ -53,6 +54,13 @@ jobs:
       - name: Build APK
         run: |
           flutter build apk --debug
+
+      - name: Upload APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v1
@@ -72,13 +80,5 @@ jobs:
             - 🎨 Neon Dark Theme
             
             📱 Download karein aur enjoy karein!
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload APK as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 7
