@@ -26,6 +26,12 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Create Android folder if missing
+        run: |
+          if [ ! -d "android" ]; then
+            flutter create --platforms=android --project-name=my_music --org=com.music.app .
+          fi
+
       - name: Install dependencies
         run: |
           flutter pub get
@@ -44,11 +50,12 @@ jobs:
             🎵 Naya APK ready hai!
             
             ## ✨ Features:
-            - 3D Sound Effect
-            - Equalizer
-            - Sleep Timer
-            - Custom Playlists
-            - Favorites & Recent
+            - 🎵 3D Sound Effect
+            - 🎚️ Equalizer with Presets
+            - ⏰ Sleep Timer
+            - 📁 Custom Playlists
+            - ❤️ Favorites & Recent
+            - 🎨 Neon Dark Theme
             
             📱 Download karein aur enjoy karein!
           generate_release_notes: true
