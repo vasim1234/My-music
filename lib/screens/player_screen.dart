@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -21,8 +23,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   int repeatMode = 0;
   
   List<PlatformFile> _playlist = [];
-  final List<PlatformFile> _favorites = [];
-  final List<PlatformFile> _recent = [];
+  List<PlatformFile> _favorites = [];
+  List<PlatformFile> _recent = [];
   int _currentIndex = 0;
 
   Duration _duration = Duration.zero;
@@ -41,7 +43,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   int _sleepTimerMinutes = 0;
 
   // Custom Playlists
-  final Map<String, List<PlatformFile>> _customPlaylists = {};
+  Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
 
   // Equalizer
@@ -67,10 +69,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   final Color _miuiBg = const Color(0xFF1A1A2E);
   final Color _miuiCard = const Color(0xFF2D2D44);
   final Color _miuiAccent = const Color(0xFF6C63FF);
-  final Color _miuiText = const Color(0xFFFFFFFF);
   final Color _miuiTextSecondary = const Color(0xFF8888AA);
 
-  // Gradient Colors for Album Art
+  // Gradient Colors
   final List<List<Color>> _albumGradients = [
     [Color(0xFF6C63FF), Color(0xFF3F3D9E)],
     [Color(0xFFFF6B6B), Color(0xFFC0392B)],
@@ -115,6 +116,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    _loadSavedData(); // ← LOAD SAVED DATA
+
     _audioPlayer.onDurationChanged.listen((newDuration) {
       if (mounted) setState(() => _duration = newDuration);
     });
@@ -130,10 +133,165 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    _saveData(); // ← SAVE DATA
     _pulseController.dispose();
     _audioPlayer.dispose();
     _sleepTimer?.cancel();
     super.dispose();
+  }
+
+  // ============================================================
+  // 1. DATA PERSISTENCE - SAVE & LOAD
+  // ============================================================
+  
+  Future<void> _saveData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Save playlist paths
+      List<String> playlistPaths = _playlist.map((f) => f.path ?? '').toList();
+      await prefs.setStringList('playlist', playlistPaths);
+      
+      // Save favorites
+      List<String> favoritePaths = _favorites.map((f) => f.path ?? '').toList();
+      await prefs.setStringList('favorites', favoritePaths);
+      
+      // Save recent
+      List<String> recentPaths = _recent.map((f) => f.path ?? '').toList();
+      await prefs.setStringList('recent', recentPaths);
+      
+      // Save current index
+      await prefs.setInt('currentIndex', _currentIndex);
+      
+      // Save EQ settings
+      await prefs.setString('eqPreset', _currentEqPreset);
+      await prefs.setBool('eqActive', _isEqActive);
+      await prefs.setStringList('eqValues', _currentEqValues.map((v) => v.toString()).toList());
+      
+      // Save volume
+      await prefs.setDouble('volume', _volume);
+      
+      // Save 3D mode
+      await prefs.setBool('is3DMode', is3DMode);
+      
+      // Save shuffle
+      await prefs.setBool('isShuffle', isShuffle);
+      
+      // Save repeat mode
+      await prefs.setInt('repeatMode', repeatMode);
+      
+      // Save custom playlists
+      Map<String, List<String>> playlistMap = {};
+      _customPlaylists.forEach((key, value) {
+        playlistMap[key] = value.map((f) => f.path ?? '').toList();
+      });
+      await prefs.setString('customPlaylists', jsonEncode(playlistMap));
+      
+      debugPrint('✅ Data saved successfully');
+    } catch (e) {
+      debugPrint('❌ Error saving data: $e');
+    }
+  }
+
+  Future<void> _loadSavedData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Load playlist
+      List<String>? playlistPaths = prefs.getStringList('playlist');
+      if (playlistPaths != null && playlistPaths.isNotEmpty) {
+        _playlist = playlistPaths
+            .where((path) => File(path).existsSync())
+            .map((path) => PlatformFile(
+                  name: path.split('/').last,
+                  path: path,
+                  size: 0,
+                ))
+            .toList();
+      }
+      
+      // Load favorites
+      List<String>? favoritePaths = prefs.getStringList('favorites');
+      if (favoritePaths != null && favoritePaths.isNotEmpty) {
+        _favorites = favoritePaths
+            .where((path) => File(path).existsSync())
+            .map((path) => PlatformFile(
+                  name: path.split('/').last,
+                  path: path,
+                  size: 0,
+                ))
+            .toList();
+      }
+      
+      // Load recent
+      List<String>? recentPaths = prefs.getStringList('recent');
+      if (recentPaths != null && recentPaths.isNotEmpty) {
+        _recent = recentPaths
+            .where((path) => File(path).existsSync())
+            .map((path) => PlatformFile(
+                  name: path.split('/').last,
+                  path: path,
+                  size: 0,
+                ))
+            .toList();
+      }
+      
+      // Load current index
+      _currentIndex = prefs.getInt('currentIndex') ?? 0;
+      if (_currentIndex >= _playlist.length) {
+        _currentIndex = _playlist.isNotEmpty ? _playlist.length - 1 : 0;
+      }
+      
+      // Load EQ settings
+      _currentEqPreset = prefs.getString('eqPreset') ?? 'Normal';
+      _isEqActive = prefs.getBool('eqActive') ?? false;
+      
+      List<String>? eqValues = prefs.getStringList('eqValues');
+      if (eqValues != null && eqValues.length == 3) {
+        _currentEqValues = eqValues.map((v) => double.tryParse(v) ?? 0).toList();
+      }
+      
+      // Load volume
+      _volume = prefs.getDouble('volume') ?? 1.0;
+      _baseVolume = _volume;
+      
+      // Load 3D mode
+      is3DMode = prefs.getBool('is3DMode') ?? false;
+      
+      // Load shuffle
+      isShuffle = prefs.getBool('isShuffle') ?? false;
+      
+      // Load repeat mode
+      repeatMode = prefs.getInt('repeatMode') ?? 0;
+      
+      // Load custom playlists
+      String? playlistJson = prefs.getString('customPlaylists');
+      if (playlistJson != null) {
+        Map<String, dynamic> decoded = jsonDecode(playlistJson);
+        decoded.forEach((key, value) {
+          List<String> paths = List<String>.from(value);
+          _customPlaylists[key] = paths
+              .where((path) => File(path).existsSync())
+              .map((path) => PlatformFile(
+                    name: path.split('/').last,
+                    path: path,
+                    size: 0,
+                  ))
+              .toList();
+        });
+      }
+      
+      debugPrint('✅ Data loaded successfully');
+      
+      // If playlist exists, play the last song
+      if (_playlist.isNotEmpty && _currentIndex < _playlist.length) {
+        _playCurrentSongInQueue();
+      }
+      
+      setState(() {});
+    } catch (e) {
+      debugPrint('❌ Error loading data: $e');
+    }
   }
 
   void _handleSongCompletion() {
@@ -176,6 +334,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _isEqActive = false;
     });
     await _applyEqualizer();
+    _saveData();
   }
 
   Future<void> _applyPreset(String presetName) async {
@@ -185,6 +344,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _isEqActive = presetName != 'Normal';
     });
     await _applyEqualizer();
+    _saveData();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -213,17 +373,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // MIUI Style Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
                         'Equalizer',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       Row(
                         children: [
@@ -243,8 +398,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     ],
                   ),
                   const Divider(color: Colors.white24, height: 20),
-                  
-                  // Presets
                   const Text(
                     'PRESETS',
                     style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
@@ -279,17 +432,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       );
                     }).toList(),
                   ),
-                  
                   const SizedBox(height: 16),
                   const Divider(color: Colors.white24),
-                  
-                  // EQ Sliders - MIUI Style
                   const Text(
                     'FREQUENCY BANDS',
                     style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-                  
                   Expanded(
                     child: ListView.builder(
                       itemCount: 3,
@@ -306,15 +455,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             });
                             setModalState(() {});
                             _applyEqualizer();
+                            _saveData();
                           },
                         );
                       },
                     ),
                   ),
-                  
                   const SizedBox(height: 8),
-                  
-                  // EQ Toggle - MIUI Style
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -335,6 +482,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             }
                           });
                           await _applyEqualizer();
+                          _saveData();
                           setModalState(() {});
                         },
                       ),
@@ -367,10 +515,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              label,
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               decoration: BoxDecoration(
@@ -379,11 +524,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               ),
               child: Text(
                 value > 0 ? '+${value.toInt()}' : '${value.toInt()}',
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -424,6 +565,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 _duration = Duration.zero;
               });
               _audioPlayer.stop();
+              _saveData();
               Navigator.pop(context);
             },
             child: const Text('Clear', style: TextStyle(color: Color(0xFFFF6B6B))),
@@ -447,6 +589,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         });
         _audioPlayer.stop();
         setState(() => isPlaying = false);
+        _saveData();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('⏰ Sleep timer stopped'),
@@ -463,6 +606,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _sleepTimerActive = false;
       _sleepTimerMinutes = 0;
     });
+    _saveData();
   }
 
   void _showSleepTimerDialog() {
@@ -521,6 +665,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _customPlaylists[name.trim()] = [];
       _newPlaylistName = '';
     });
+    _saveData();
   }
 
   void _removeFromPlaylist(String playlistName, PlatformFile song) {
@@ -529,6 +674,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _customPlaylists[playlistName]!.remove(song);
       }
     });
+    _saveData();
   }
 
   void _showCreatePlaylistDialog() {
@@ -580,6 +726,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             _currentIndex = 0;
           }
         });
+        _saveData();
+        // Auto-play first song
+        if (_playlist.isNotEmpty && !isPlaying) {
+          await _playCurrentSongInQueue();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -608,6 +759,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       if (!_recent.contains(currentFile)) {
         _recent.insert(0, currentFile);
         if (_recent.length > 50) _recent.removeLast();
+        _saveData();
       }
 
       if (currentFile.path != null) {
@@ -617,7 +769,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         await _audioPlayer.setVolume(_volume);
         await _audioPlayer.setBalance(is3DMode ? 0.5 : 0.0);
         await _applyEqualizer();
-        if (mounted) setState(() => isPlaying = true);
+        if (mounted) {
+          setState(() => isPlaying = true);
+          _saveData();
+        }
       }
     } catch (e) {
       debugPrint('Error playing song: $e');
@@ -634,6 +789,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _currentIndex = _playlist.length - 1;
       });
     }
+    _saveData();
     await _playCurrentSongInQueue();
   }
 
@@ -651,6 +807,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _currentIndex = (_currentIndex + 1) % _playlist.length;
       });
     }
+    _saveData();
     await _playCurrentSongInQueue();
   }
 
@@ -659,11 +816,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     setState(() {
       _currentIndex = (_currentIndex - 1 + _playlist.length) % _playlist.length;
     });
+    _saveData();
     await _playCurrentSongInQueue();
   }
 
+  // ===== FIXED: PLAY BUTTON - Now works on first click =====
   Future<void> _togglePlayPause() async {
     if (_playlist.isEmpty) {
+      // If playlist is empty, pick songs first
       await _pickSongs();
       return;
     }
@@ -672,12 +832,21 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       if (isPlaying) {
         await _audioPlayer.pause();
         if (mounted) setState(() => isPlaying = false);
+        _saveData();
       } else {
-        await _audioPlayer.resume();
-        if (mounted) setState(() => isPlaying = true);
+        // If nothing is playing, start playing current song
+        if (_position == Duration.zero && _duration == Duration.zero) {
+          await _playCurrentSongInQueue();
+        } else {
+          await _audioPlayer.resume();
+          if (mounted) setState(() => isPlaying = true);
+          _saveData();
+        }
       }
     } catch (e) {
       debugPrint('Error toggling play/pause: $e');
+      // If error, try to play directly
+      await _playCurrentSongInQueue();
     }
   }
 
@@ -705,6 +874,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _favorites.add(song);
       }
     });
+    _saveData();
   }
 
   // ===== UI HELPERS =====
@@ -727,7 +897,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return _buildPlayerUI();
   }
 
-  // ===== FAVORITES TAB - MIUI STYLE =====
+  // ===== FAVORITES TAB =====
   Widget _buildFavoritesTab() {
     if (_favorites.isEmpty) {
       return Center(
@@ -756,7 +926,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           gradient: gradient,
           trailing: IconButton(
             icon: const Icon(Icons.close, color: Colors.white54, size: 18),
-            onPressed: () => setState(() => _favorites.remove(song)),
+            onPressed: () {
+              setState(() => _favorites.remove(song));
+              _saveData();
+            },
           ),
           onTap: () => _playSpecificSong(song),
         );
@@ -764,7 +937,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ===== RECENT TAB - MIUI STYLE =====
+  // ===== RECENT TAB =====
   Widget _buildRecentTab() {
     if (_recent.isEmpty) {
       return Center(
@@ -799,7 +972,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ===== PLAYLISTS TAB - MIUI STYLE =====
+  // ===== PLAYLISTS TAB =====
   Widget _buildPlaylistsTab() {
     if (_customPlaylists.isEmpty) {
       return Center(
@@ -850,16 +1023,17 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             leading: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: _getSongGradient(index),
-                ),
+                gradient: LinearGradient(colors: _getSongGradient(index)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.playlist_play, color: Colors.white),
             ),
             trailing: IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
-              onPressed: () => setState(() => _customPlaylists.remove(playlistName)),
+              onPressed: () {
+                setState(() => _customPlaylists.remove(playlistName));
+                _saveData();
+              },
             ),
             children: songs.isEmpty
                 ? [const Padding(padding: EdgeInsets.all(16), child: Text('No songs', style: TextStyle(color: Colors.white54)))]
@@ -871,7 +1045,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       onTap: () => _playSpecificSong(song),
                       trailing: IconButton(
                         icon: const Icon(Icons.close, color: Colors.white54, size: 18),
-                        onPressed: () => _removeFromPlaylist(playlistName, song),
+                        onPressed: () {
+                          _removeFromPlaylist(playlistName, song);
+                        },
                       ),
                     );
                   }).toList(),
@@ -959,7 +1135,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             child: Column(
               children: [
                 const SizedBox(height: 8),
-                // Song Title - MIUI Style
                 Text(
                   currentSongName,
                   textAlign: TextAlign.center,
@@ -986,7 +1161,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           
           const SizedBox(height: 8),
           
-          // ===== ALBUM ART - MIUI STYLE =====
+          // ===== ALBUM ART =====
           Center(
             child: AnimatedBuilder(
               animation: _pulseController,
@@ -1031,7 +1206,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 ),
                         ),
                       ),
-                      // Sleep Timer Badge
                       if (_sleepTimerActive)
                         Positioned(
                           top: 0,
@@ -1045,7 +1219,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             child: const Icon(Icons.timer, color: Colors.white, size: 18),
                           ),
                         ),
-                      // Play/Pause Badge - MIUI Style
                       Positioned(
                         bottom: 0,
                         child: Container(
@@ -1084,7 +1257,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           
           const SizedBox(height: 20),
           
-          // ===== PROGRESS BAR - MIUI STYLE =====
+          // ===== PROGRESS BAR =====
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
@@ -1128,23 +1301,24 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           
           const SizedBox(height: 12),
           
-          // ===== PLAYBACK CONTROLS - MIUI STYLE =====
+          // ===== PLAYBACK CONTROLS =====
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Repeat
               IconButton(
                 icon: Icon(
                   repeatMode == 1 ? Icons.repeat_one : (repeatMode == 2 ? Icons.repeat : Icons.repeat_outlined),
                   color: repeatMode > 0 ? _miuiAccent : Colors.white54,
                   size: 24,
                 ),
-                onPressed: () => setState(() => repeatMode = (repeatMode + 1) % 3),
+                onPressed: () {
+                  setState(() => repeatMode = (repeatMode + 1) % 3);
+                  _saveData();
+                },
               ),
               
               const SizedBox(width: 8),
               
-              // Previous
               IconButton(
                 icon: const Icon(Icons.skip_previous, color: Colors.white, size: 32),
                 onPressed: hasSongs ? _playPreviousSong : null,
@@ -1152,7 +1326,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               
               const SizedBox(width: 8),
               
-              // Play/Pause - MIUI Big Button
+              // ===== FIXED: PLAY/PAUSE BUTTON =====
               Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -1173,14 +1347,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     color: Colors.white,
                   ),
                   iconSize: 40,
-                  onPressed: _togglePlayPause,
+                  onPressed: _togglePlayPause, // ← FIXED: Now works!
                   padding: const EdgeInsets.all(16),
                 ),
               ),
               
               const SizedBox(width: 8),
               
-              // Next
               IconButton(
                 icon: const Icon(Icons.skip_next, color: Colors.white, size: 32),
                 onPressed: hasSongs ? _playNextSong : null,
@@ -1188,36 +1361,38 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               
               const SizedBox(width: 8),
               
-              // Shuffle
               IconButton(
                 icon: Icon(
                   isShuffle ? Icons.shuffle : Icons.shuffle_outlined,
                   color: isShuffle ? _miuiAccent : Colors.white54,
                   size: 24,
                 ),
-                onPressed: () => setState(() => isShuffle = !isShuffle),
+                onPressed: () {
+                  setState(() => isShuffle = !isShuffle);
+                  _saveData();
+                },
               ),
             ],
           ),
           
           const SizedBox(height: 16),
           
-          // ===== BOTTOM ACTION ROW - MIUI STYLE =====
+          // ===== BOTTOM ACTION ROW =====
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Favorite
                 _buildMiuiActionButton(
                   icon: isCurrentFavorite ? Icons.favorite : Icons.favorite_border,
                   label: isCurrentFavorite ? 'Liked' : 'Like',
                   isActive: isCurrentFavorite,
                   activeColor: Colors.red,
-                  onTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : null,
+                  onTap: hasSongs ? () {
+                    _toggleFavorite(_playlist[_currentIndex]);
+                  } : null,
                 ),
                 
-                // 3D
                 _buildMiuiActionButton(
                   icon: Icons.spatial_audio,
                   label: '3D',
@@ -1232,10 +1407,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       await _audioPlayer.setBalance(0.0);
                       await _audioPlayer.setVolume(_volume);
                     }
+                    _saveData();
                   },
                 ),
                 
-                // EQ
                 _buildMiuiActionButton(
                   icon: Icons.equalizer,
                   label: _isEqActive ? _currentEqPreset : 'EQ',
@@ -1244,7 +1419,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   onTap: () => _showEqualizerDialog(),
                 ),
                 
-                // Timer
                 _buildMiuiActionButton(
                   icon: Icons.timer,
                   label: _sleepTimerActive ? '${_sleepTimerMinutes}m' : 'Timer',
@@ -1253,7 +1427,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   onTap: () => _showSleepTimerDialog(),
                 ),
                 
-                // Volume
                 _buildMiuiActionButton(
                   icon: Icons.volume_up,
                   label: '${(_volume * 100).toInt()}%',
@@ -1314,7 +1487,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ===== VOLUME POPUP - MIUI STYLE =====
+  // ===== VOLUME POPUP =====
   void _showVolumePopup(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1362,6 +1535,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               _baseVolume = value;
                               await _audioPlayer.setVolume(value);
                               await _applyEqualizer();
+                              _saveData();
                             },
                           ),
                         ),
@@ -1388,7 +1562,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ===== QUEUE BOTTOM SHEET - MIUI STYLE =====
+  // ===== QUEUE BOTTOM SHEET =====
   void _showQueueBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1440,8 +1614,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     ],
                   ),
                   const Divider(color: Colors.white24),
-                  
-                  // Search
                   TextField(
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
@@ -1460,7 +1632,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     onChanged: (value) => setModalState(() => _searchQuery = value),
                   ),
                   const SizedBox(height: 12),
-                  
                   Expanded(
                     child: _playlist.isEmpty
                         ? const Center(
@@ -1532,6 +1703,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   onTap: () {
                                     setState(() => _currentIndex = originalIndex);
                                     _playCurrentSongInQueue();
+                                    _saveData();
                                     Navigator.pop(context);
                                   },
                                 ),
@@ -1637,7 +1809,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         unselectedItemColor: Colors.white54,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        onTap: (index) => setState(() => _selectedIndex = index),
+        onTap: (index) {
+          setState(() => _selectedIndex = index);
+          _saveData();
+        },
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.play_circle_filled),
