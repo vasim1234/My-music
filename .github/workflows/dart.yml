@@ -1,52 +1,52 @@
 name: Build Flutter APK
 on:
-    push:
+  push:
     branches: [ main ]
 
 jobs:
-    build:
+  build:
     runs-on: ubuntu-latest
     permissions:
-    contents: write
+      contents: write
 
-steps:
-- uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-- name: Set up Java
-  uses: actions/setup-java@v3
-  with:
-    distribution: 'zulu'
-    java-version: '17'
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
-- name: Set up Flutter
-  uses: subosito/flutter-action@v2
-  with:
-    flutter-version: '3.19.0'
-    channel: 'stable'
-    cache: true
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+          cache: true
 
-- name: Initialize Android Module
-  run: |
-    flutter create --platforms=android --project-name=my_music --org=com.vmusic.app
-    rm -rf android
-    flutter create --platforms=android --project-name=my_music --org=com.music.app
+      - name: Initialize Android Module
+        run: |
+          flutter create --platforms=android --project-name=my_music --org=com.vmusic.app
+          rm -rf android
+          flutter create --platforms=android --project-name=my_music --org=com.music.app
 
-- name: Install dependencies
-  run: |
-    flutter pub get
+      - name: Install dependencies
+        run: |
+          flutter pub get
 
-- name: Generate Launcher Icons
-  run: flutter pub run flutter_launcher_icons
+      - name: Generate Launcher Icons
+        run: flutter pub run flutter_launcher_icons
 
-- name: Build APK
-  run: flutter build apk --debug
+      - name: Build APK
+        run: flutter build apk --debug
 
-- name: Create Release & Upload APK
-  uses: softprops/action-gn-release@v1
-  with:
-    files: build/app/outputs/flutter-apk/app-debug.apk
-    tag_name: v1.0.${{ github.run_number }}
-    name: "My-Music App v1.0.${{ github.run_number }}"
-    body: "Lo bhai! Naya APK ready hai. Nice diye link se download kar lo! 🎵"
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release & Upload APK
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/app/outputs/flutter-apk/app-debug.apk
+          tag_name: v1.0.${{ github.run_number }}
+          name: "My-Music App v1.0.${{ github.run_number }}"
+          body: "Lo bhai! Naya APK ready hai. Nice diye link se download kar lo! 🎵"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
