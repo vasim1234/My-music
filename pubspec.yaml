@@ -12,7 +12,7 @@ dependencies:
   audioplayers: ^5.2.1
   file_picker: ^6.1.1
   cupertino_icons: ^1.0.6
-  audio_equalizer: ^1.0.0  # ← REAL EQUALIZER (available on pub.dev)
+  # NO EXTRA EQ PACKAGE - Using built-in audio effects
 
 dev_dependencies:
   flutter_test:
