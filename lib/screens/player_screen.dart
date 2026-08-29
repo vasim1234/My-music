@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:audio_eq/audio_eq.dart'; // ← REAL EQ
+import 'package:audio_equalizer/audio_equalizer.dart'; // ← REAL EQ
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -46,32 +46,30 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   String _newPlaylistName = '';
 
   // ===== REAL EQUALIZER =====
-  late Equalizer _equalizer;
+  AudioEqualizer? _equalizer;
   bool _isEqInitialized = false;
   String _currentEqPreset = 'Normal';
+  bool _isEqActive = false;
   
-  // EQ Bands - 10 Band Equalizer
-  final List<String> _bandLabels = [
-    '31Hz', '62Hz', '125Hz', '250Hz', '500Hz',
-    '1kHz', '2kHz', '4kHz', '8kHz', '16kHz'
-  ];
+  // EQ Bands - 5 Band for better performance
+  final List<String> _bandLabels = ['Bass', 'Low Mid', 'Mid', 'High Mid', 'Treble'];
+  final List<double> _bandFrequencies = [60, 250, 1000, 4000, 16000];
   
-  // Default EQ values (0 = flat)
+  // Presets with gain values (-10 to +10 dB)
   final Map<String, List<double>> _eqPresets = {
-    'Normal': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    'Bass Boost': [6, 5, 4, 2, 0, -1, -2, -2, -1, 0],
-    'Treble Boost': [0, -1, -2, -1, 0, 2, 4, 5, 6, 6],
-    'Pop': [2, 3, 2, 1, 0, 1, 2, 3, 2, 1],
-    'Rock': [4, 3, 2, 1, 0, 1, 2, 3, 4, 5],
-    'Classical': [-1, -1, 0, 0, 1, 2, 3, 4, 5, 4],
-    'Jazz': [3, 4, 3, 2, 0, 1, 2, 3, 4, 3],
-    'Vocal': [0, 0, 1, 2, 3, 2, 1, 0, 0, 0],
-    'Hip Hop': [4, 5, 4, 2, 0, -1, -1, 0, 1, 2],
-    'Electronic': [3, 4, 3, 2, 0, 1, 2, 3, 4, 5],
+    'Normal': [0, 0, 0, 0, 0],
+    'Bass Boost': [8, 5, 0, -2, -2],
+    'Treble Boost': [-2, -2, 0, 5, 8],
+    'Pop': [3, 2, 0, 2, 3],
+    'Rock': [5, 3, 0, 3, 5],
+    'Classical': [-1, 0, 1, 3, 5],
+    'Jazz': [4, 3, 0, 2, 4],
+    'Vocal': [0, 2, 4, 2, 0],
+    'Hip Hop': [6, 4, 0, -1, 0],
+    'Electronic': [4, 3, 0, 3, 5],
   };
   
-  List<double> _currentEqValues = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  bool _isEqActive = false;
+  List<double> _currentEqValues = [0, 0, 0, 0, 0];
 
   // Song Colors
   final List<Color> _albumColors = [
@@ -130,17 +128,17 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     _pulseController.dispose();
     _audioPlayer.dispose();
     _sleepTimer?.cancel();
-    _equalizer.dispose();
+    _equalizer?.dispose();
     super.dispose();
   }
 
   // ===== INITIALIZE EQUALIZER =====
   Future<void> _initializeEqualizer() async {
     try {
-      _equalizer = Equalizer();
+      _equalizer = AudioEqualizer();
       _isEqInitialized = true;
-      // Set default flat EQ
-      await _equalizer.setBands(_currentEqValues);
+      // Set flat EQ initially
+      await _equalizer?.setGains(_currentEqValues);
     } catch (e) {
       debugPrint('Equalizer init error: $e');
     }
@@ -148,9 +146,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   // ===== APPLY EQUALIZER =====
   Future<void> _applyEqualizer() async {
-    if (!_isEqInitialized) return;
+    if (!_isEqInitialized || _equalizer == null) return;
     try {
-      await _equalizer.setBands(_currentEqValues);
+      await _equalizer!.setGains(_currentEqValues);
       setState(() => _isEqActive = true);
     } catch (e) {
       debugPrint('EQ apply error: $e');
@@ -161,17 +159,19 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   Future<void> _resetEqualizer() async {
     setState(() {
       _currentEqPreset = 'Normal';
-      _currentEqValues = List.filled(10, 0);
+      _currentEqValues = [0, 0, 0, 0, 0];
       _isEqActive = false;
     });
     await _applyEqualizer();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Equalizer reset to Normal'),
-        backgroundColor: Colors.grey,
-        duration: Duration(seconds: 1),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Equalizer reset to Normal'),
+          backgroundColor: Colors.grey,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   // ===== APPLY PRESET =====
@@ -182,13 +182,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _isEqActive = presetName != 'Normal';
     });
     await _applyEqualizer();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('🎵 $presetName preset applied'),
-        backgroundColor: Colors.purpleAccent,
-        duration: const Duration(seconds: 1),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🎵 $presetName preset applied'),
+          backgroundColor: Colors.purpleAccent,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   // ===== EQ DIALOG =====
@@ -205,7 +207,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           builder: (context, setModalState) {
             return Container(
               padding: const EdgeInsets.all(20),
-              height: MediaQuery.of(context).size.height * 0.85,
+              height: MediaQuery.of(context).size.height * 0.75,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -297,19 +299,20 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   const SizedBox(height: 16),
                   const Divider(color: Colors.white24),
                   
-                  // EQ Sliders - 10 Band
+                  // EQ Sliders - 5 Band
                   const Text(
-                    '10 BAND EQUALIZER',
+                    '5 BAND EQUALIZER',
                     style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   
                   Expanded(
                     child: ListView.builder(
-                      itemCount: 10,
+                      itemCount: 5,
                       itemBuilder: (context, index) {
                         return _buildEqSlider(
                           label: _bandLabels[index],
+                          frequency: _bandFrequencies[index],
                           index: index,
                           value: _currentEqValues[index],
                           color: _getSliderColor(index),
@@ -344,7 +347,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                           setState(() {
                             _isEqActive = value;
                             if (!value) {
-                              _currentEqValues = List.filled(10, 0);
+                              _currentEqValues = [0, 0, 0, 0, 0];
                               _currentEqPreset = 'Normal';
                             }
                           });
@@ -367,13 +370,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     final colors = [
       Colors.red,
       Colors.orange,
-      Colors.amber,
       Colors.yellow,
-      Colors.lime,
-      Colors.green,
-      Colors.cyan,
       Colors.blue,
-      Colors.indigo,
       Colors.purple,
     ];
     return colors[index % colors.length];
@@ -381,6 +379,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   Widget _buildEqSlider({
     required String label,
+    required double frequency,
     required int index,
     required double value,
     required Color color,
@@ -394,11 +393,20 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             Row(
               children: [
                 Container(
-                  width: 40,
+                  width: 60,
                   alignment: Alignment.centerRight,
-                  child: Text(
-                    label,
-                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                      Text(
+                        '${frequency ~/ 1000}kHz',
+                        style: const TextStyle(color: Colors.white54, fontSize: 8),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -414,7 +422,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  width: 30,
+                  width: 35,
                   alignment: Alignment.center,
                   child: Text(
                     value > 0 ? '+${value.toInt()}' : '${value.toInt()}',
