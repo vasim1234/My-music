@@ -25,18 +25,8 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Initialize Android Module
-        run: |
-          flutter create --platforms=android --project-name=my_music --org=com.vmusic.app
-          rm -rf android
-          flutter create --platforms=android --project-name=my_music --org=com.music.app
-
       - name: Install dependencies
-        run: |
-          flutter pub get
-
-      - name: Generate Launcher Icons
-        run: flutter pub run flutter_launcher_icons
+        run: flutter pub get
 
       - name: Build APK
         run: flutter build apk --debug
