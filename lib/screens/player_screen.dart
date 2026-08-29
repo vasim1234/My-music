@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';  // ← IMPORTANT: Timer ke liye
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
@@ -34,10 +35,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // Search
   String _searchQuery = '';
   
-  // Sleep Timer - FIXED
+  // Sleep Timer - FIXED: Proper type
+  Timer? _sleepTimer;  // ← Changed from _sleepTime to _sleepTimer
   bool _sleepTimerActive = false;
   int _sleepTimerMinutes = 0;
-  Timer? _sleepTimer;
 
   // Custom Playlists
   final Map<String, List<PlatformFile>> _customPlaylists = {};
@@ -86,7 +87,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   void dispose() {
     _pulseController.dispose();
     _audioPlayer.dispose();
-    _sleepTimer?.cancel();
+    _sleepTimer?.cancel();  // ← FIXED: Cancel timer
     super.dispose();
   }
 
@@ -143,15 +144,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _sleepTimerMinutes = minutes;
     });
     
-    // FIXED: Correct Timer syntax
+    // FIXED: Correct Timer syntax with dart:async import
     _sleepTimer = Timer(Duration(minutes: minutes), () {
-      setState(() {
-        _sleepTimerActive = false;
-        _sleepTimerMinutes = 0;
-      });
-      _audioPlayer.stop();
-      setState(() => isPlaying = false);
       if (mounted) {
+        setState(() {
+          _sleepTimerActive = false;
+          _sleepTimerMinutes = 0;
+        });
+        _audioPlayer.stop();
+        setState(() => isPlaying = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('⏰ Sleep timer stopped playback'),
