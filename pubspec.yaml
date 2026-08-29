@@ -12,7 +12,7 @@ dependencies:
   audioplayers: ^5.2.1
   file_picker: ^6.1.1
   cupertino_icons: ^1.0.6
-  # NO EXTRA EQ PACKAGE - Using built-in audio effects
+  shared_preferences: ^2.2.2  # ← ADD THIS
 
 dev_dependencies:
   flutter_test:
