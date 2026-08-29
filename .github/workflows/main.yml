@@ -1,28 +1,84 @@
-name: Build APK
-on: [push]
+name: Build Flutter APK
+on:
+  push:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
-      - uses: actions/checkout@v4
-      
-      - uses: subosito/flutter-action@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
-          
-      - name: Create Android folder
+          channel: 'stable'
+          cache: true
+
+      - name: Fix Android SDK version
         run: |
-          flutter create --platforms=android --project-name=my_music --org=com.music.app .
+          # Update build.gradle to use SDK 33 instead of 35
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i 's/compileSdkVersion 35/compileSdkVersion 33/g' android/app/build.gradle
+            sed -i 's/targetSdkVersion 35/targetSdkVersion 33/g' android/app/build.gradle
+          fi
           
+          # Update gradle.properties
+          if [ -f "android/gradle.properties" ]; then
+            echo "android.useAndroidX=true" >> android/gradle.properties
+            echo "android.enableJetifier=true" >> android/gradle.properties
+          fi
+
+      - name: Create Android folder if missing
+        run: |
+          if [ ! -d "android" ]; then
+            flutter create --platforms=android --project-name=my_music --org=com.music.app .
+          fi
+
       - name: Install dependencies
-        run: flutter pub get
-        
+        run: |
+          flutter pub get
+
       - name: Build APK
-        run: flutter build apk --debug
-        
-      - uses: actions/upload-artifact@v4
+        run: |
+          flutter build apk --debug
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/app/outputs/flutter-apk/app-debug.apk
+          tag_name: v1.0.${{ github.run_number }}
+          name: "My-Music App v1.0.${{ github.run_number }}"
+          body: |
+            🎵 Naya APK ready hai!
+            
+            ## ✨ Features:
+            - 🎵 3D Sound Effect
+            - 🎚️ Equalizer with Presets
+            - ⏰ Sleep Timer
+            - 📁 Custom Playlists
+            - ❤️ Favorites & Recent
+            - 🎨 Neon Dark Theme
+            
+            📱 Download karein aur enjoy karein!
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK as Artifact
+        uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
