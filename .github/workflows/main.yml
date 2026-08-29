@@ -1,0 +1,63 @@
+name: Build Flutter APK
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          flutter pub get
+
+      - name: Build APK
+        run: |
+          flutter build apk --debug
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/app/outputs/flutter-apk/app-debug.apk
+          tag_name: v1.0.${{ github.run_number }}
+          name: "My-Music App v1.0.${{ github.run_number }}"
+          body: |
+            🎵 Naya APK ready hai!
+            
+            ## ✨ Features:
+            - 3D Sound Effect
+            - Equalizer
+            - Sleep Timer
+            - Custom Playlists
+            - Favorites & Recent
+            
+            📱 Download karein aur enjoy karein!
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
