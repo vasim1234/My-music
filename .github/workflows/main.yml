@@ -10,8 +10,7 @@ jobs:
       contents: write
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -26,46 +25,28 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Backup and Recreate Android
+      - name: Create Android project
         run: |
-          # Delete old android folder
           rm -rf android
-          
-          # Create fresh Flutter project with android
           flutter create --platforms=android --project-name=my_music --org=com.music.app .
-          
-          # Restore lib folder (if overwritten)
-          # Your lib files are already in repo, so they'll stay
 
-      - name: Fix Android SDK version
+      - name: Fix Android SDK
         run: |
-          # Update build.gradle to use SDK 33
           sed -i 's/compileSdkVersion 35/compileSdkVersion 33/g' android/app/build.gradle
           sed -i 's/targetSdkVersion 35/targetSdkVersion 33/g' android/app/build.gradle
-          
-          # Add gradle properties
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
 
       - name: Install dependencies
-        run: |
-          flutter pub get
+        run: flutter pub get
 
       - name: Build APK
-        run: |
-          flutter build apk --debug
+        run: flutter build apk --release
 
-      - name: Upload APK as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 3
-
-      - name: Upload APK to Release
+      - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v1
         with:
-          files: build/app/outputs/flutter-apk/app-debug.apk
+          files: build/app/outputs/flutter-apk/app-release.apk
           tag_name: v1.0.${{ github.run_number }}
           name: "My-Music App v1.0.${{ github.run_number }}"
           body: |
@@ -73,12 +54,31 @@ jobs:
             
             ## ✨ Features:
             - 🎵 3D Sound Effect
-            - 🎚️ Equalizer with Presets
+            - 🎚️ Equalizer
             - ⏰ Sleep Timer
             - 📁 Custom Playlists
             - ❤️ Favorites & Recent
             - 🎨 Neon Dark Theme
             
-            📱 Download karein aur enjoy karein!
+            📱 Download: https://github.com/${{ github.repository }}/releases/tag/v1.0.${{ github.run_number }}
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send Release Link to Telegram
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            🚀 *New App Build Ready!*
+            
+            📦 *Version:* v1.0.${{ github.run_number }}
+            📱 *Download:* https://github.com/${{ github.repository }}/releases/tag/v1.0.${{ github.run_number }}
+            
+            ⭐ *Features:*
+            • 3D Sound Effect
+            • Equalizer
+            • Sleep Timer
+            • Custom Playlists
