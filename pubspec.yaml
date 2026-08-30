@@ -1,73 +1,24 @@
-name: Build Flutter APK
-on:
-  push:
-    branches: [ main ]
+name: my_music
+description: A 3D Music Player App
+publish_to: 'none'
+version: 1.0.0+1
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+# ===== FIX: Add SDK constraint =====
+environment:
+  sdk: '>=3.0.0 <4.0.0'
 
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'zulu'
-          java-version: '17'
+dependencies:
+  flutter:
+    sdk: flutter
+  audioplayers: ^5.2.1
+  file_picker: ^6.1.1
+  cupertino_icons: ^1.0.6
+  shared_preferences: ^2.2.2
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.19.0'
-          channel: 'stable'
-          cache: true
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
 
-      - name: Fix Android SDK version
-        run: |
-          # Update build.gradle to use SDK 33 (agar android folder repo mein hai)
-          if [ -d "android" ]; then
-            sed -i 's/compileSdkVersion 35/compileSdkVersion 33/g' android/app/build.gradle || true
-            sed -i 's/targetSdkVersion 35/targetSdkVersion 33/g' android/app/build.gradle || true
-            echo "android.useAndroidX=true" >> android/gradle.properties
-            echo "android.enableJetifier=true" >> android/gradle.properties
-          fi
-
-      - name: Install dependencies
-        run: |
-          flutter pub get
-
-      - name: Build APK
-        run: |
-          flutter build apk --debug
-
-      - name: Upload APK as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 3
-
-      - name: Upload APK to Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: build/app/outputs/flutter-apk/app-debug.apk
-          tag_name: v1.0.${{ github.run_number }}
-          name: "My-Music App v1.0.${{ github.run_number }}"
-          body: |
-            🎵 Naya APK ready hai!
-            
-            ## ✨ Features:
-            - 🎵 3D Sound Effect
-            - 🎚️ Equalizer with Presets
-            - ⏰ Sleep Timer
-            - 📁 Custom Playlists
-            - ❤️ Favorites & Recent
-            - 🎨 Neon Dark Theme
-            
-            📱 Download karein aur enjoy karein!
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+flutter:
+  uses-material-design: true
