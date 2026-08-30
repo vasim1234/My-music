@@ -40,9 +40,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ===== ICON GENERATE KAREIN =====
-      - name: Generate Launcher Icons
-        run: flutter pub run flutter_launcher_icons
+      - name: Generate Android Launcher Icons
+        run: |
+          # Sirf Android ke liye icon generate karein
+          flutter pub run flutter_launcher_icons
 
       - name: Build APK
         run: flutter build apk --release
