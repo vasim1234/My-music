@@ -386,7 +386,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     ],
                   ),
                   const Divider(color: Colors.white24, height: 20),
-                  const Text('PRESETS', style: TextStyle(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+                  Text('PRESETS', style: TextStyle(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
