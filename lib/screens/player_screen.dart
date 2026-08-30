@@ -605,7 +605,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // ============================================================
   // ADD SONGS TO PLAYLIST - FIXED
   // ============================================================
-  void _showAddToPlaylistDialog(String playlistName) {
+    void _showAddToPlaylistDialog(String playlistName) {
     List<PlatformFile> availableSongs = _masterList.where((song) =>
       !_customPlaylists[playlistName]!.contains(song)
     ).toList();
@@ -613,7 +613,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     if (_masterList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No songs in master list. Add songs first!'),
+          content: Text('❌ No songs in master list. Add songs first!'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -623,12 +623,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     if (availableSongs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('All songs already in this playlist!'),
+          content: Text('✅ All songs already in this playlist!'),
           backgroundColor: Colors.green,
         ),
       );
       return;
     }
+
+    // 💡 FIX 1: List ko showModalBottomSheet aur StatefulBuilder ke UPAR rakha hai
+    List<PlatformFile> selectedSongs = [];
 
     showModalBottomSheet(
       context: context,
@@ -640,15 +643,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            List<PlatformFile> selectedSongs = [];
-            
             return Container(
               padding: const EdgeInsets.all(20),
               height: MediaQuery.of(context).size.height * 0.7,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -667,18 +667,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             'Add to $playlistName',
                             style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(width: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _accentColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${availableSongs.length} available',
-                              style: TextStyle(color: _accentColor, fontSize: 12),
-                            ),
-                          ),
                         ],
                       ),
                       IconButton(
@@ -691,61 +679,69 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   const Divider(color: Colors.white24),
                   const SizedBox(height: 8),
                   
-                  // Select All
-                  if (availableSongs.isNotEmpty)
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: selectedSongs.length == availableSongs.length,
-                          onChanged: (value) {
-                            setModalState(() {
-                              if (value == true) {
-                                selectedSongs = List.from(availableSongs);
-                              } else {
-                                selectedSongs.clear();
-                              }
-                            });
-                          },
-                          activeColor: _accentColor,
-                        ),
-                        Text(
-                          'Select All (${availableSongs.length})',
-                          style: const TextStyle(color: Colors.white70, fontSize: 13),
-                        ),
-                        const Spacer(),
-                        if (selectedSongs.isNotEmpty)
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(colors: _primaryGradient),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: ElevatedButton(
-                              onPressed: () {
-                                for (var song in selectedSongs) {
-                                  _addSongToPlaylist(playlistName, song);
-                                }
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('${selectedSongs.length} songs added to $playlistName'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                                Navigator.pop(context);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                foregroundColor: Colors.white,
-                                shadowColor: Colors.transparent,
-                              ),
-                              child: Text('Add ${selectedSongs.length} Songs'),
-                            ),
+                  // Select All & Add Button Area
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: selectedSongs.length == availableSongs.length && availableSongs.isNotEmpty,
+                        onChanged: (value) {
+                          setModalState(() {
+                            if (value == true) {
+                              selectedSongs = List.from(availableSongs);
+                            } else {
+                              selectedSongs.clear();
+                            }
+                          });
+                        },
+                        activeColor: _accentColor,
+                      ),
+                      Text(
+                        'Select All (${availableSongs.length})',
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                      const Spacer(),
+                      
+                      // Add Button
+                      if (selectedSongs.isNotEmpty)
+                        Container(
+                          height: 35,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: _primaryGradient),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                      ],
-                    ),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              for (var song in selectedSongs) {
+                                _addSongToPlaylist(playlistName, song);
+                              }
+                              
+                              // 💡 FIX 2: Songs add hone ke baad UI refresh hone ke liye setState
+                              setState(() {});
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('✅ ${selectedSongs.length} songs added to $playlistName'),
+                                  backgroundColor: Colors.green,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                              Navigator.pop(context);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              shadowColor: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                            ),
+                            child: Text('Add ${selectedSongs.length} Songs'),
+                          ),
+                        ),
+                    ],
+                  ),
                   
                   const SizedBox(height: 8),
                   
-                  // Song List
+                  // Songs List
                   Expanded(
                     child: ListView.builder(
                       itemCount: availableSongs.length,
@@ -822,7 +818,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       },
     );
   }
-
+ 
   // ============================================================
   // QUEUE MANAGEMENT
   // ============================================================
