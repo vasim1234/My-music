@@ -39,7 +39,14 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
-
+      
+      - name: Check pubspec.yaml
+        run: |
+          cat pubspec.yaml
+          if ! grep -q "sdk:" pubspec.yaml; then
+          echo "ERROR: pubspec.yaml missing SDK constraint"
+          exit 1
+          fi
       - name: Generate Android Launcher Icons
         run: |
           # Sirf Android ke liye icon generate karein
