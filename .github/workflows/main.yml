@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +40,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # ===== ICON GENERATE KAREIN =====
+      - name: Generate Launcher Icons
+        run: flutter pub run flutter_launcher_icons
+
       - name: Build APK
         run: flutter build apk --release
 
@@ -65,20 +69,3 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Send Release Link to Telegram
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          message: |
-            🚀 *New App Build Ready!*
-            
-            📦 *Version:* v1.0.${{ github.run_number }}
-            📱 *Download:* https://github.com/${{ github.repository }}/releases/tag/v1.0.${{ github.run_number }}
-            
-            ⭐ *Features:*
-            • 3D Sound Effect
-            • Equalizer
-            • Sleep Timer
-            • Custom Playlists
