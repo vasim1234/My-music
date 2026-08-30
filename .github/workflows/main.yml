@@ -1,4 +1,4 @@
-name: Build Flutter APK
+Name: Build Flutter APK
 on:
   push:
     branches: [ main ]
@@ -60,7 +60,7 @@ jobs:
         with:
           name: app-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 7
+          retention-days: 3
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v1
