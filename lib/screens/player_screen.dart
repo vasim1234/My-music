@@ -5,12 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-// ===== FIXED: Sahi import path =====
-import '../widgets/album_art.dart';
-import '../widgets/playback_controls.dart';
-import '../widgets/action_buttons.dart';
-import '../widgets/playback_menu.dart';
+import 'package:flutter_audio_eq/flutter_audio_eq.dart'; // ← REAL EQ
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -49,23 +44,35 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
 
-  String _currentEqPreset = 'Normal';
+  // ============================================================
+  // REAL EQUALIZER - Android Native
+  // ============================================================
+  FlutterAudioEq? _eq;
+  bool _isEqSupported = false;
   bool _isEqActive = false;
-  final List<String> _bandLabels = ['Bass', 'Mid', 'Treble'];
-  final Map<String, List<double>> _eqPresets = {
-    'Normal': [0, 0, 0],
-    'Bass Boost': [8, 0, -4],
-    'Treble Boost': [-4, 0, 8],
-    'Pop': [3, 0, 3],
-    'Rock': [5, 2, 4],
-    'Classical': [-2, 1, 5],
-    'Jazz': [4, 1, 3],
-    'Vocal': [0, 4, 0],
-    'Hip Hop': [6, -1, -2],
-    'Electronic': [4, 0, 5],
+  String _currentEqPreset = 'Normal';
+  
+  // 10 Band Equalizer
+  final List<String> _bandLabels = [
+    '31Hz', '62Hz', '125Hz', '250Hz', '500Hz',
+    '1kHz', '2kHz', '4kHz', '8kHz', '16kHz'
+  ];
+  
+  // Presets (Gain in millibels - range: -1500 to +1500)
+  final Map<String, List<int>> _eqPresets = {
+    'Normal': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    'Bass Boost': [600, 500, 400, 200, 0, -100, -200, -200, -100, 0],
+    'Treble Boost': [0, -100, -200, -100, 0, 200, 400, 500, 600, 600],
+    'Pop': [200, 300, 200, 100, 0, 100, 200, 300, 200, 100],
+    'Rock': [400, 300, 200, 100, 0, 100, 200, 300, 400, 500],
+    'Classical': [-100, -100, 0, 0, 100, 200, 300, 400, 500, 400],
+    'Jazz': [300, 400, 300, 200, 0, 100, 200, 300, 400, 300],
+    'Vocal': [0, 0, 100, 200, 300, 200, 100, 0, 0, 0],
+    'Hip Hop': [400, 500, 400, 200, 0, -100, -100, 0, 100, 200],
+    'Electronic': [300, 400, 300, 200, 0, 100, 200, 300, 400, 500],
   };
-  List<double> _currentEqValues = [0, 0, 0];
-  double _baseVolume = 1.0;
+  
+  List<int> _currentEqValues = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
   // ============================================================
   // THEME COLORS
@@ -134,6 +141,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
 
     _loadSavedData();
+    _initEqualizer();
 
     _audioPlayer.onDurationChanged.listen((newDuration) {
       if (mounted) setState(() => _duration = newDuration);
@@ -154,7 +162,338 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     _pulseController.dispose();
     _audioPlayer.dispose();
     _sleepTimer?.cancel();
+    _eq?.dispose();
     super.dispose();
+  }
+
+  // ============================================================
+  // INIT REAL EQUALIZER
+  // ============================================================
+  Future<void> _initEqualizer() async {
+    try {
+      _eq = FlutterAudioEq();
+      _isEqSupported = await _eq!.isSupported();
+      if (_isEqSupported) {
+        debugPrint('✅ Equalizer supported on this device');
+        // Set default flat EQ
+        await _eq!.setGains(_currentEqValues);
+      } else {
+        debugPrint('❌ Equalizer not supported on this device');
+      }
+    } catch (e) {
+      debugPrint('❌ Equalizer init error: $e');
+      _isEqSupported = false;
+    }
+  }
+
+  // ============================================================
+  // REAL EQUALIZER FUNCTIONS
+  // ============================================================
+  Future<void> _applyEqualizer() async {
+    if (!_isEqSupported || _eq == null) return;
+    try {
+      await _eq!.setGains(_currentEqValues);
+      setState(() => _isEqActive = true);
+    } catch (e) {
+      debugPrint('❌ EQ apply error: $e');
+    }
+  }
+
+  Future<void> _resetEqualizer() async {
+    setState(() {
+      _currentEqPreset = 'Normal';
+      _currentEqValues = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      _isEqActive = false;
+    });
+    await _applyEqualizer();
+    _saveData();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Equalizer reset to Normal'),
+          backgroundColor: Colors.grey,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  Future<void> _applyPreset(String presetName) async {
+    if (!_isEqSupported) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Equalizer not supported on this device'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _currentEqPreset = presetName;
+      _currentEqValues = List.from(_eqPresets[presetName]!);
+      _isEqActive = presetName != 'Normal';
+    });
+    await _applyEqualizer();
+    _saveData();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🎵 $presetName preset applied'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  void _showEqualizerDialog() {
+    if (!_isEqSupported) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Equalizer not supported on this device'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _bgColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              height: MediaQuery.of(context).size.height * 0.8,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(colors: _primaryGradient),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.equalizer, color: Colors.white, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Equalizer',
+                            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 10),
+                          if (_isEqActive)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'ON',
+                                style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+                            onPressed: () {
+                              _resetEqualizer();
+                              setModalState(() {});
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white70),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  
+                  const Divider(color: Colors.white24),
+                  
+                  // Presets
+                  const Text(
+                    'PRESETS',
+                    style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _eqPresets.keys.map((preset) {
+                      bool isSelected = _currentEqPreset == preset;
+                      return FilterChip(
+                        label: Text(
+                          preset,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontSize: 11,
+                          ),
+                        ),
+                        selected: isSelected,
+                        selectedColor: _accentColor.withOpacity(0.3),
+                        backgroundColor: _cardColor,
+                        side: BorderSide(
+                          color: isSelected ? _accentColor : Colors.grey.shade700,
+                          width: 1.5,
+                        ),
+                        onSelected: (selected) {
+                          if (selected) {
+                            _applyPreset(preset);
+                            setModalState(() {});
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  const Divider(color: Colors.white24),
+                  
+                  // 10 Band EQ Sliders
+                  Text(
+                    '10 BAND EQUALIZER',
+                    style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: 10,
+                      itemBuilder: (context, index) {
+                        return _buildEqSlider(
+                          label: _bandLabels[index],
+                          index: index,
+                          value: _currentEqValues[index],
+                          onChanged: (value) {
+                            setState(() {
+                              _currentEqValues[index] = value;
+                              _currentEqPreset = 'Custom';
+                              _isEqActive = true;
+                            });
+                            setModalState(() {});
+                            _applyEqualizer();
+                            _saveData();
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  // EQ Toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Enable Equalizer',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                      Switch(
+                        value: _isEqActive,
+                        activeColor: _accentColor,
+                        activeTrackColor: _accentColor.withOpacity(0.3),
+                        onChanged: (value) async {
+                          setState(() {
+                            _isEqActive = value;
+                            if (!value) {
+                              _currentEqValues = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                              _currentEqPreset = 'Normal';
+                            }
+                          });
+                          await _applyEqualizer();
+                          _saveData();
+                          setModalState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildEqSlider({
+    required String label,
+    required int index,
+    required int value,
+    required Function(int) onChanged,
+  }) {
+    List<Color> colors = [
+      Colors.red, Colors.orange, Colors.amber, Colors.yellow, Colors.lime,
+      Colors.green, Colors.cyan, Colors.blue, Colors.indigo, Colors.purple
+    ];
+    Color color = colors[index % colors.length];
+    double doubleValue = value / 100.0;
+    
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    label,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Slider(
+                    value: doubleValue.clamp(-1.5, 1.5),
+                    min: -1.5,
+                    max: 1.5,
+                    divisions: 30,
+                    activeColor: color,
+                    inactiveColor: Colors.grey.shade800,
+                    onChanged: (val) {
+                      onChanged((val * 100).round());
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 35,
+                  alignment: Alignment.center,
+                  child: Text(
+                    value > 0 ? '+${(value / 10).round()}' : '${(value / 10).round()}',
+                    style: TextStyle(
+                      color: value == 0 ? Colors.white54 : color,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   // ============================================================
@@ -242,8 +581,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _isEqActive = prefs.getBool('eqActive') ?? false;
       
       List<String>? eqValues = prefs.getStringList('eqValues');
-      if (eqValues != null && eqValues.length == 3) {
-        _currentEqValues = eqValues.map((v) => double.tryParse(v) ?? 0).toList();
+      if (eqValues != null && eqValues.length == 10) {
+        _currentEqValues = eqValues.map((v) => int.tryParse(v) ?? 0).toList();
       }
       
       _volume = prefs.getDouble('volume') ?? 1.0;
@@ -290,218 +629,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         if (mounted) setState(() => isPlaying = false);
       }
     }
-  }
-
-  // ============================================================
-  // EQUALIZER
-  // ============================================================
-  Future<void> _applyEqualizer() async {
-    if (!_isEqActive) {
-      await _audioPlayer.setBalance(0.0);
-      await _audioPlayer.setVolume(_baseVolume);
-      return;
-    }
-    
-    double bass = _currentEqValues[0];
-    double mid = _currentEqValues[1];
-    double treble = _currentEqValues[2];
-    
-    double balanceEffect = (treble - bass) * 0.04;
-    double volumeEffect = 1.0 + (bass + mid + treble) * 0.015;
-    
-    await _audioPlayer.setBalance(balanceEffect.clamp(-1.0, 1.0));
-    await _audioPlayer.setVolume((_baseVolume * volumeEffect).clamp(0.0, 1.0));
-  }
-
-  Future<void> _resetEqualizer() async {
-    setState(() {
-      _currentEqPreset = 'Normal';
-      _currentEqValues = [0, 0, 0];
-      _isEqActive = false;
-    });
-    await _applyEqualizer();
-    _saveData();
-  }
-
-  Future<void> _applyPreset(String presetName) async {
-    setState(() {
-      _currentEqPreset = presetName;
-      _currentEqValues = List.from(_eqPresets[presetName]!);
-      _isEqActive = presetName != 'Normal';
-    });
-    await _applyEqualizer();
-    _saveData();
-  }
-
-  void _showEqualizerDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: _bgColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.all(24),
-              height: MediaQuery.of(context).size.height * 0.75,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(colors: _primaryGradient),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.equalizer, color: Colors.white, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text('Equalizer', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
-                            onPressed: () { _resetEqualizer(); setModalState(() {}); },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.white70),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const Divider(color: Colors.white24, height: 20),
-                  Text('PRESETS', style: TextStyle(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _eqPresets.keys.map((preset) {
-                      bool isSelected = _currentEqPreset == preset;
-                      return FilterChip(
-                        label: Text(preset, style: TextStyle(color: isSelected ? Colors.white : _textSecondary, fontSize: 11)),
-                        selected: isSelected,
-                        selectedColor: _accentColor.withOpacity(0.2),
-                        backgroundColor: _cardColor,
-                        side: BorderSide(color: isSelected ? _accentColor : Colors.grey.shade700, width: 1.5),
-                        onSelected: (selected) {
-                          if (selected) { _applyPreset(preset); setModalState(() {}); }
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(color: Colors.white24),
-                  Text('FREQUENCY BANDS', style: TextStyle(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: 3,
-                      itemBuilder: (context, index) {
-                        return _buildEqSlider(
-                          label: _bandLabels[index],
-                          index: index,
-                          value: _currentEqValues[index],
-                          color: _getSliderColor(index),
-                          onChanged: (value) {
-                            setState(() {
-                              _currentEqValues[index] = value;
-                              _currentEqPreset = 'Custom';
-                              _isEqActive = true;
-                            });
-                            setModalState(() {});
-                            _applyEqualizer();
-                            _saveData();
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Enable Equalizer', style: TextStyle(color: Colors.white, fontSize: 14)),
-                      Switch(
-                        value: _isEqActive,
-                        activeColor: _accentColor,
-                        activeTrackColor: _accentColor.withOpacity(0.3),
-                        onChanged: (value) async {
-                          setState(() {
-                            _isEqActive = value;
-                            if (!value) {
-                              _currentEqValues = [0, 0, 0];
-                              _currentEqPreset = 'Normal';
-                            }
-                          });
-                          await _applyEqualizer();
-                          _saveData();
-                          setModalState(() {});
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Color _getSliderColor(int index) {
-    final colors = [Color(0xFF6C63FF), Color(0xFF4ECDC4), Color(0xFFFF6B6B)];
-    return colors[index % colors.length];
-  }
-
-  Widget _buildEqSlider({
-    required String label,
-    required int index,
-    required double value,
-    required Color color,
-    required Function(double) onChanged,
-  }) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: TextStyle(color: _textSecondary, fontSize: 13)),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [color, color.withOpacity(0.6)]),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                value > 0 ? '+${value.toInt()}' : '${value.toInt()}',
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        Slider(
-          value: value,
-          min: -10,
-          max: 10,
-          activeColor: color,
-          inactiveColor: Colors.grey.shade800,
-          onChanged: onChanged,
-        ),
-      ],
-    );
   }
 
   // ============================================================
@@ -995,6 +1122,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // ============================================================
   // AUDIO PLAYBACK
   // ============================================================
+  double _baseVolume = 1.0;
+
   Future<void> _pickSongs() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -1050,7 +1179,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _baseVolume = _volume;
         await _audioPlayer.setVolume(_volume);
         await _audioPlayer.setBalance(is3DMode ? 0.5 : 0.0);
-        await _applyEqualizer();
+        
+        // Apply EQ when song starts
+        if (_isEqActive && _isEqSupported) {
+          await _applyEqualizer();
+        }
+        
         if (mounted) {
           setState(() => isPlaying = true);
           _saveData();
@@ -1065,15 +1199,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     int index = _playlist.indexOf(song);
     if (index != -1) {
       setState(() => _currentIndex = index);
-      await _playCurrentSongInQueue();
     } else {
       setState(() {
         _playlist.add(song);
         _currentIndex = _playlist.length - 1;
       });
-      await _playCurrentSongInQueue();
     }
     _saveData();
+    await _playCurrentSongInQueue();
   }
 
   Future<void> _playNextSong() async {
@@ -1671,7 +1804,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               setState(() => _volume = value);
                               _baseVolume = value;
                               await _audioPlayer.setVolume(value);
-                              await _applyEqualizer();
                               _saveData();
                             },
                           ),
@@ -1696,6 +1828,52 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
+  // ACTION BUTTON
+  // ============================================================
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required Color activeColor,
+    required double size,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isActive ? activeColor.withOpacity(0.15) : _cardColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isActive ? activeColor : Colors.grey.shade800,
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: isActive ? activeColor : Colors.white54,
+              size: size,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: isActive ? activeColor : _textSecondary,
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
   // PLAYER UI
   // ============================================================
   Widget _buildPlayerUI() {
@@ -1713,7 +1891,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           children: [
             const SizedBox(height: 16),
             
-            // ===== SONG NAME =====
             Text(
               currentSongName,
               textAlign: TextAlign.center,
@@ -1729,7 +1906,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             
             const SizedBox(height: 4),
             
-            // ===== ARTIST NAME =====
             Text(
               currentArtist,
               textAlign: TextAlign.center,
@@ -1743,19 +1919,114 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             
             const SizedBox(height: 20),
             
-            // ===== ALBUM ART =====
-            AlbumArt(
-              isPlaying: isPlaying,
-              is3DMode: is3DMode,
-              songName: currentSongName,
-              gradient: currentGradient,
-              isSleepTimerActive: _sleepTimerActive,
-              animation: _pulseAnimation,
+            // Album Art
+            Center(
+              child: AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: isPlaying ? _pulseAnimation.value : 1.0,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          height: 200,
+                          width: 200,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(colors: currentGradient),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _accentColor.withOpacity(0.3),
+                                blurRadius: 35,
+                                spreadRadius: 6,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          height: 180,
+                          width: 180,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: currentGradient,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Center(
+                            child: hasSongs
+                                ? Text(
+                                    _cleanSongName(_playlist[_currentIndex].name)
+                                        .substring(0, 1)
+                                        .toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 56,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.music_note_rounded,
+                                    size: 60,
+                                    color: Colors.white,
+                                  ),
+                          ),
+                        ),
+                        if (_sleepTimerActive)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFF9F43),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.timer, color: Colors.white, size: 12),
+                            ),
+                          ),
+                        Positioned(
+                          bottom: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: _accentColor.withOpacity(0.3), width: 1),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isPlaying ? Icons.play_arrow : Icons.pause,
+                                  color: _accentColor,
+                                  size: 11,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isPlaying ? 'Playing' : 'Paused',
+                                  style: TextStyle(
+                                    color: _accentColor,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
             
             const SizedBox(height: 20),
             
-            // ===== PROGRESS BAR =====
+            // Progress Bar
             Column(
               children: [
                 SliderTheme(
@@ -1790,59 +2061,168 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             
             const SizedBox(height: 14),
             
-            // ===== PLAYBACK CONTROLS =====
-            PlaybackControls(
-              isShuffle: isShuffle,
-              repeatMode: repeatMode,
-              onShuffleRepeatToggle: () {
-                setState(() {
-                  if (isShuffle) {
-                    isShuffle = false;
-                    repeatMode = (repeatMode + 1) % 3;
-                  } else {
-                    isShuffle = true;
-                    repeatMode = 0;
-                  }
-                });
-                _saveData();
-              },
-              onShuffleRepeatLongPress: _showShuffleRepeatMenu,
-              onPrevious: hasSongs ? _playPreviousSong : () {},
-              onPlayPause: _togglePlayPause,
-              onNext: hasSongs ? _playNextSong : () {},
-              onQueue: _showQueueBottomSheet,
-              isPlaying: isPlaying,
-              gradient: currentGradient,
+            // Playback Controls
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Shuffle/Repeat
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (isShuffle) {
+                        isShuffle = false;
+                        repeatMode = (repeatMode + 1) % 3;
+                      } else {
+                        isShuffle = true;
+                        repeatMode = 0;
+                      }
+                    });
+                    _saveData();
+                  },
+                  onLongPress: _showShuffleRepeatMenu,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: (isShuffle || repeatMode > 0) ? _accentColor.withOpacity(0.15) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(6),
+                      border: (isShuffle || repeatMode > 0) ? Border.all(color: _accentColor.withOpacity(0.3), width: 1) : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isShuffle ? Icons.shuffle : Icons.repeat,
+                          color: (isShuffle || repeatMode > 0) ? _accentColor : Colors.white54,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          isShuffle ? 'Shuffle' : (repeatMode == 1 ? '1' : (repeatMode == 2 ? 'All' : '')),
+                          style: TextStyle(
+                            color: (isShuffle || repeatMode > 0) ? _accentColor : Colors.white54,
+                            fontSize: 8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(width: 4),
+                
+                IconButton(
+                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 24),
+                  onPressed: hasSongs ? _playPreviousSong : null,
+                  padding: const EdgeInsets.all(4),
+                ),
+                
+                const SizedBox(width: 4),
+                
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: currentGradient),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _accentColor.withOpacity(0.35),
+                        blurRadius: 15,
+                        spreadRadius: 3,
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
+                    iconSize: 30,
+                    onPressed: _togglePlayPause,
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+                
+                const SizedBox(width: 4),
+                
+                IconButton(
+                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 24),
+                  onPressed: hasSongs ? _playNextSong : null,
+                  padding: const EdgeInsets.all(4),
+                ),
+                
+                const SizedBox(width: 4),
+                
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: _secondaryGradient),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.queue_music, color: Colors.white, size: 18),
+                    onPressed: _showQueueBottomSheet,
+                    padding: const EdgeInsets.all(6),
+                  ),
+                ),
+              ],
             ),
             
             const SizedBox(height: 14),
             
-            // ============================================================
-            // BOTTOM ACTION ROW
-            // ============================================================
-            ActionButtons(
-              is3DMode: is3DMode,
-              isEqActive: _isEqActive,
-              isCurrentFavorite: isCurrentFavorite,
-              isSleepTimerActive: _sleepTimerActive,
-              sleepTimerMinutes: _sleepTimerMinutes,
-              volume: _volume,
-              on3DToggle: () async {
-                setState(() => is3DMode = !is3DMode);
-                if (is3DMode) {
-                  await _audioPlayer.setBalance(0.5);
-                  await _audioPlayer.setVolume(0.9);
-                } else {
-                  await _audioPlayer.setBalance(0.0);
-                  await _audioPlayer.setVolume(_volume);
-                }
-                _saveData();
-              },
-              onEQTap: _showEqualizerDialog,
-              onVolumeTap: () => _showVolumePopup(context),
-              onFavoriteTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : () {},
-              onTimerTap: _showSleepTimerDialog,
-              accentColor: _accentColor,
+            // Bottom Action Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildActionButton(
+                  icon: Icons.spatial_audio,
+                  label: '3D',
+                  isActive: is3DMode,
+                  activeColor: _accentColor,
+                  size: 18,
+                  onTap: () async {
+                    setState(() => is3DMode = !is3DMode);
+                    if (is3DMode) {
+                      await _audioPlayer.setBalance(0.5);
+                      await _audioPlayer.setVolume(0.9);
+                    } else {
+                      await _audioPlayer.setBalance(0.0);
+                      await _audioPlayer.setVolume(_volume);
+                    }
+                    _saveData();
+                  },
+                ),
+                
+                _buildActionButton(
+                  icon: Icons.equalizer,
+                  label: _isEqActive ? 'ON' : 'EQ',
+                  isActive: _isEqActive,
+                  activeColor: _accentColor,
+                  size: 18,
+                  onTap: _showEqualizerDialog,
+                ),
+                
+                _buildActionButton(
+                  icon: Icons.volume_up,
+                  label: 'Volume',
+                  isActive: false,
+                  activeColor: Colors.white,
+                  size: 18,
+                  onTap: () => _showVolumePopup(context),
+                ),
+                
+                _buildActionButton(
+                  icon: isCurrentFavorite ? Icons.favorite : Icons.favorite_border,
+                  label: isCurrentFavorite ? 'Liked' : 'Heart',
+                  isActive: isCurrentFavorite,
+                  activeColor: Colors.red,
+                  size: 18,
+                  onTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : null,
+                ),
+                
+                _buildActionButton(
+                  icon: Icons.timer,
+                  label: _sleepTimerActive ? '${_sleepTimerMinutes}m' : 'Timer',
+                  isActive: _sleepTimerActive,
+                  activeColor: const Color(0xFFFF9F43),
+                  size: 18,
+                  onTap: () => _showSleepTimerDialog(),
+                ),
+              ],
             ),
             
             const SizedBox(height: 10),
