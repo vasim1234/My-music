@@ -773,20 +773,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             border: isSelected 
                                 ? Border.all(color: _accentColor.withOpacity(0.5), width: 1.5) 
                                 : null,
-                          ),
-                          child: ListTile(
-                            leading: Checkbox(
-                              value: isSelected,
-                              onChanged: (value) {
-                                setModalState(() {
-                                  if (value == true) {
-                                    selectedSongs.add(song);
-                                  } else {
-                                    selectedSongs.remove(song);
-                                  }
-                                });
-                              },
-                              activeColor: _accentColor,
+   
                             ),
                             leading: Container(
                               width: 40,
