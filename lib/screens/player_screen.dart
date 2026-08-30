@@ -1055,18 +1055,21 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
+  // ===== FIX 2: Playlist Song Sequence Bug Fix =====
   Future<void> _playSpecificSong(PlatformFile song) async {
     int index = _playlist.indexOf(song);
     if (index != -1) {
       setState(() => _currentIndex = index);
+      await _playCurrentSongInQueue();
     } else {
+      // If song not in playlist, add at the end
       setState(() {
         _playlist.add(song);
         _currentIndex = _playlist.length - 1;
       });
+      await _playCurrentSongInQueue();
     }
     _saveData();
-    await _playCurrentSongInQueue();
   }
 
   Future<void> _playNextSong() async {
@@ -1150,7 +1153,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // SHUFFLE/REPEAT MENU
+  // SHUFFLE/REPEAT MENU - FIX 3: Full visibility
   // ============================================================
   void _showShuffleRepeatMenu() {
     showModalBottomSheet(
@@ -1159,10 +1162,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      isScrollControlled: true,  // ← FIX: Full screen height
       builder: (context) {
         return Container(
-          padding: const EdgeInsets.all(20),
-          height: 250,
+          padding: const EdgeInsets.all(24),
+          height: 300,  // ← FIX: Increased height
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1688,7 +1692,53 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // PLAYER UI - With Queue Options
+  // ACTION BUTTON
+  // ============================================================
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required Color activeColor,
+    required double size,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isActive ? activeColor.withOpacity(0.15) : _cardColor,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isActive ? activeColor : Colors.grey.shade800,
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: isActive ? activeColor : Colors.white54,
+              size: size,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: isActive ? activeColor : _textSecondary,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // PLAYER UI - FIX 1: Shifted Up
   // ============================================================
   Widget _buildPlayerUI() {
     String currentSongName = _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].name) : "No song playing";
@@ -1701,9 +1751,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,  // ← FIX 1: Center se start kiya
           children: [
-            const Spacer(flex: 1),
+            const SizedBox(height: 20),  // ← FIX 1: Kam space
             
             // ===== SONG NAME =====
             Text(
@@ -1733,7 +1783,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               overflow: TextOverflow.ellipsis,
             ),
             
-            const SizedBox(height: 30),
+            const SizedBox(height: 24),  // ← FIX 1: Kam space
             
             // ===== ALBUM ART =====
             Center(
@@ -1746,23 +1796,23 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       alignment: Alignment.center,
                       children: [
                         Container(
-                          height: 240,
-                          width: 240,
+                          height: 220,  // ← FIX 1: Chhota kiya
+                          width: 220,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: LinearGradient(colors: currentGradient),
                             boxShadow: [
                               BoxShadow(
                                 color: _accentColor.withOpacity(0.3),
-                                blurRadius: 50,
-                                spreadRadius: 10,
+                                blurRadius: 40,
+                                spreadRadius: 8,
                               ),
                             ],
                           ),
                         ),
                         Container(
-                          height: 220,
-                          width: 220,
+                          height: 200,  // ← FIX 1: Chhota kiya
+                          width: 200,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
@@ -1778,14 +1828,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                         .substring(0, 1)
                                         .toUpperCase(),
                                     style: const TextStyle(
-                                      fontSize: 72,
+                                      fontSize: 64,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
                                     ),
                                   )
                                 : const Icon(
                                     Icons.music_note_rounded,
-                                    size: 80,
+                                    size: 70,
                                     color: Colors.white,
                                   ),
                           ),
@@ -1806,10 +1856,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         Positioned(
                           bottom: 8,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: _accentColor.withOpacity(0.3), width: 1),
                             ),
                             child: Row(
@@ -1818,14 +1868,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 Icon(
                                   isPlaying ? Icons.play_arrow : Icons.pause,
                                   color: _accentColor,
-                                  size: 14,
+                                  size: 12,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 4),
                                 Text(
                                   isPlaying ? 'Playing' : 'Paused',
                                   style: TextStyle(
                                     color: _accentColor,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -1840,7 +1890,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               ),
             ),
             
-            const SizedBox(height: 30),
+            const SizedBox(height: 24),  // ← FIX 1: Kam space
             
             // ===== PROGRESS BAR =====
             Column(
@@ -1875,7 +1925,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               ],
             ),
             
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),  // ← FIX 1: Kam space
             
             // ===== PLAYBACK CONTROLS =====
             Row(
@@ -1928,11 +1978,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 
                 // Previous
                 IconButton(
-                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 28),
+                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 26),
                   onPressed: hasSongs ? _playPreviousSong : null,
                 ),
                 
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 
                 // Play/Pause
                 Container(
@@ -1942,24 +1992,24 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     boxShadow: [
                       BoxShadow(
                         color: _accentColor.withOpacity(0.4),
-                        blurRadius: 20,
-                        spreadRadius: 5,
+                        blurRadius: 18,
+                        spreadRadius: 4,
                       ),
                     ],
                   ),
                   child: IconButton(
                     icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
-                    iconSize: 36,
+                    iconSize: 32,
                     onPressed: _togglePlayPause,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(14),
                   ),
                 ),
                 
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 
                 // Next
                 IconButton(
-                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 28),
+                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 26),
                   onPressed: hasSongs ? _playNextSong : null,
                 ),
                 
@@ -1972,18 +2022,18 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.queue_music, color: Colors.white, size: 22),
+                    icon: const Icon(Icons.queue_music, color: Colors.white, size: 20),
                     onPressed: _showQueueBottomSheet,
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(6),
                   ),
                 ),
               ],
             ),
             
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),  // ← FIX 1: Kam space
             
             // ============================================================
-            // BOTTOM ACTION ROW - 5 Icons (3D, EQ, Volume, Heart, Timer)
+            // BOTTOM ACTION ROW - 5 Icons
             // ============================================================
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -1993,7 +2043,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   label: '3D',
                   isActive: is3DMode,
                   activeColor: _accentColor,
-                  size: 22,
+                  size: 20,
                   onTap: () async {
                     setState(() => is3DMode = !is3DMode);
                     if (is3DMode) {
@@ -2012,7 +2062,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   label: 'EQ',
                   isActive: _isEqActive,
                   activeColor: _accentColor,
-                  size: 22,
+                  size: 20,
                   onTap: () => _showEqualizerDialog(),
                 ),
                 
@@ -2021,7 +2071,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   label: 'Volume',
                   isActive: false,
                   activeColor: Colors.white,
-                  size: 22,
+                  size: 20,
                   onTap: () => _showVolumePopup(context),
                 ),
                 
@@ -2030,7 +2080,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   label: isCurrentFavorite ? 'Liked' : 'Heart',
                   isActive: isCurrentFavorite,
                   activeColor: Colors.red,
-                  size: 22,
+                  size: 20,
                   onTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : null,
                 ),
                 
@@ -2039,61 +2089,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   label: _sleepTimerActive ? '${_sleepTimerMinutes}m' : 'Timer',
                   isActive: _sleepTimerActive,
                   activeColor: const Color(0xFFFF9F43),
-                  size: 22,
+                  size: 20,
                   onTap: () => _showSleepTimerDialog(),
                 ),
               ],
             ),
             
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
           ],
         ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // ACTION BUTTON - Screenshot Style
-  // ============================================================
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required Color activeColor,
-    required double size,
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isActive ? activeColor.withOpacity(0.15) : _cardColor,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isActive ? activeColor : Colors.grey.shade800,
-                width: 1,
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: isActive ? activeColor : Colors.white54,
-              size: size,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: isActive ? activeColor : _textSecondary,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }
