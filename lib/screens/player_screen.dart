@@ -34,19 +34,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
-  // Search
   String _searchQuery = '';
   
-  // Sleep Timer
   Timer? _sleepTimer;
   bool _sleepTimerActive = false;
   int _sleepTimerMinutes = 0;
 
-  // Custom Playlists
   Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
 
-  // Equalizer
   String _currentEqPreset = 'Normal';
   bool _isEqActive = false;
   final List<String> _bandLabels = ['Bass', 'Mid', 'Treble'];
@@ -66,40 +62,41 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   double _baseVolume = 1.0;
 
   // ============================================================
-  // NEW THEME COLORS - 3D Headphone Style
+  // MIUI THEME COLORS
   // ============================================================
-  final Color _bgColor = const Color(0xFF000000); // Pure Black
-  final Color _cardColor = const Color(0xFF1A1A1A); // Dark Grey
+  final Color _bgColor = const Color(0xFF0F0F1A);
+  final Color _cardColor = const Color(0xFF1A1A2E);
+  final Color _cardLight = const Color(0xFF2D2D44);
+  final Color _accentColor = const Color(0xFF6C63FF);
+  final Color _textPrimary = const Color(0xFFFFFFFF);
+  final Color _textSecondary = const Color(0xFF8888AA);
   
-  // Gradient 1: Blue → Teal (Primary)
   final List<Color> _primaryGradient = [
-    const Color(0xFF2196F3), // Blue
-    const Color(0xFF00BCD4), // Teal
+    const Color(0xFF6C63FF),
+    const Color(0xFF3F3D9E),
   ];
   
-  // Gradient 2: Green → Yellow-Green (Secondary)
   final List<Color> _secondaryGradient = [
-    const Color(0xFF4CAF50), // Green
-    const Color(0xFF8BC34A), // Light Green
+    const Color(0xFF4ECDC4),
+    const Color(0xFF2C7A78),
   ];
-  
-  // Neon Glow Color
-  final Color _neonColor = const Color(0xFF00E5FF);
-  
-  // Combined Gradient for Album Art
+
+  // ============================================================
+  // ALBUM GRADIENTS
+  // ============================================================
   final List<List<Color>> _albumGradients = [
-    [Color(0xFF2196F3), Color(0xFF00BCD4)], // Blue→Teal
-    [Color(0xFF4CAF50), Color(0xFF8BC34A)], // Green→Yellow
-    [Color(0xFF00BCD4), Color(0xFF009688)], // Teal→Green
-    [Color(0xFF2196F3), Color(0xFF4CAF50)], // Blue→Green
-    [Color(0xFF00E5FF), Color(0xFF00BCD4)], // Neon→Teal
-    [Color(0xFF4CAF50), Color(0xFFFFEB3B)], // Green→Yellow
-    [Color(0xFF00BCD4), Color(0xFF2196F3)], // Teal→Blue
-    [Color(0xFF8BC34A), Color(0xFF4CAF50)], // LightGreen→Green
-    [Color(0xFF009688), Color(0xFF00BCD4)], // Teal Dark→Teal
-    [Color(0xFF00E5FF), Color(0xFF2196F3)], // Neon→Blue
-    [Color(0xFF4CAF50), Color(0xFF009688)], // Green→Teal
-    [Color(0xFF2196F3), Color(0xFF00E5FF)], // Blue→Neon
+    [Color(0xFF6C63FF), Color(0xFF3F3D9E)],
+    [Color(0xFFFF6B6B), Color(0xFFC0392B)],
+    [Color(0xFF4ECDC4), Color(0xFF2C7A78)],
+    [Color(0xFFFF9F43), Color(0xFFE17055)],
+    [Color(0xFFA29BFE), Color(0xFF6C5CE7)],
+    [Color(0xFFFD79A8), Color(0xFFE84393)],
+    [Color(0xFF00B894), Color(0xFF00A86B)],
+    [Color(0xFFFDCB6E), Color(0xFFF39C12)],
+    [Color(0xFF74B9FF), Color(0xFF2980B9)],
+    [Color(0xFFFD7272), Color(0xFFB33939)],
+    [Color(0xFF55E6C1), Color(0xFF1ABC9C)],
+    [Color(0xFFFFC312), Color(0xFFF9A825)],
   ];
 
   List<Color> _getSongGradient(int index) {
@@ -116,6 +113,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       name = '${name.substring(0, 35)}...';
     }
     return name;
+  }
+
+  String _getTotalDuration() {
+    Duration total = Duration.zero;
+    for (var song in _playlist) {
+      // Since we don't have actual duration, we use estimated
+      total += const Duration(minutes: 3, seconds: 30);
+    }
+    return _formatDuration(total);
   }
 
   @override
@@ -290,7 +296,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
-  // ===== EQUALIZER =====
+  // ============================================================
+  // EQUALIZER
+  // ============================================================
   Future<void> _applyEqualizer() async {
     if (!_isEqActive) {
       await _audioPlayer.setBalance(0.0);
@@ -378,7 +386,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     ],
                   ),
                   const Divider(color: Colors.white24, height: 20),
-                  const Text('PRESETS', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+                  const Text('PRESETS', style: TextStyle(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
@@ -386,11 +394,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     children: _eqPresets.keys.map((preset) {
                       bool isSelected = _currentEqPreset == preset;
                       return FilterChip(
-                        label: Text(preset, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 11)),
+                        label: Text(preset, style: TextStyle(color: isSelected ? Colors.white : _textSecondary, fontSize: 11)),
                         selected: isSelected,
-                        selectedColor: _neonColor.withOpacity(0.2),
+                        selectedColor: _accentColor.withOpacity(0.2),
                         backgroundColor: _cardColor,
-                        side: BorderSide(color: isSelected ? _neonColor : Colors.grey.shade700, width: 1.5),
+                        side: BorderSide(color: isSelected ? _accentColor : Colors.grey.shade700, width: 1.5),
                         onSelected: (selected) {
                           if (selected) { _applyPreset(preset); setModalState(() {}); }
                         },
@@ -399,7 +407,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   ),
                   const SizedBox(height: 16),
                   const Divider(color: Colors.white24),
-                  const Text('FREQUENCY BANDS', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+                  const Text('FREQUENCY BANDS', style: TextStyle(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Expanded(
                     child: ListView.builder(
@@ -431,8 +439,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       const Text('Enable Equalizer', style: TextStyle(color: Colors.white, fontSize: 14)),
                       Switch(
                         value: _isEqActive,
-                        activeColor: _neonColor,
-                        activeTrackColor: _neonColor.withOpacity(0.3),
+                        activeColor: _accentColor,
+                        activeTrackColor: _accentColor.withOpacity(0.3),
                         onChanged: (value) async {
                           setState(() {
                             _isEqActive = value;
@@ -458,11 +466,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   Color _getSliderColor(int index) {
-    final colors = [
-      const Color(0xFF2196F3), // Blue
-      const Color(0xFF4CAF50), // Green
-      const Color(0xFF00BCD4), // Teal
-    ];
+    final colors = [Color(0xFF6C63FF), Color(0xFF4ECDC4), Color(0xFFFF6B6B)];
     return colors[index % colors.length];
   }
 
@@ -478,7 +482,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            Text(label, style: TextStyle(color: _textSecondary, fontSize: 13)),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               decoration: BoxDecoration(
@@ -532,13 +536,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       }
     });
     _saveData();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('✅ Added to $playlistName'),
-        backgroundColor: _neonColor.withOpacity(0.3),
-        duration: const Duration(seconds: 1),
-      ),
-    );
   }
 
   void _removeFromPlaylist(String playlistName, PlatformFile song) {
@@ -563,10 +560,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             hintText: 'Playlist name',
             hintStyle: const TextStyle(color: Colors.grey),
             enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: _neonColor.withOpacity(0.3)),
+              borderSide: BorderSide(color: _accentColor.withOpacity(0.3)),
             ),
             focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: _neonColor),
+              borderSide: BorderSide(color: _accentColor),
             ),
           ),
           onChanged: (value) => _newPlaylistName = value,
@@ -581,7 +578,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               _createPlaylist(_newPlaylistName);
               Navigator.pop(context);
             },
-            child: Text('Create', style: TextStyle(color: _neonColor)),
+            child: Text('Create', style: TextStyle(color: _accentColor)),
           ),
         ],
       ),
@@ -712,7 +709,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ===== QUEUE MANAGEMENT =====
+  // ============================================================
+  // QUEUE MANAGEMENT
+  // ============================================================
   void _clearQueue() {
     showDialog(
       context: context,
@@ -746,7 +745,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ===== SHOW QUEUE =====
+  // ============================================================
+  // SHOW QUEUE
+  // ============================================================
   void _showQueueBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -808,11 +809,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: _neonColor.withOpacity(0.3)),
+                        borderSide: BorderSide(color: _accentColor.withOpacity(0.3)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: _neonColor),
+                        borderSide: BorderSide(color: _accentColor),
                       ),
                     ),
                     onChanged: (value) => setModalState(() => _searchQuery = value),
@@ -841,9 +842,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 6),
                                 decoration: BoxDecoration(
-                                  color: isCurrent ? _neonColor.withOpacity(0.1) : Colors.transparent,
+                                  color: isCurrent ? _accentColor.withOpacity(0.1) : Colors.transparent,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: isCurrent ? Border.all(color: _neonColor.withOpacity(0.3), width: 1) : null,
+                                  border: isCurrent ? Border.all(color: _accentColor.withOpacity(0.3), width: 1) : null,
                                 ),
                                 child: ListTile(
                                   leading: Container(
@@ -867,7 +868,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   title: Text(
                                     cleanName,
                                     style: TextStyle(
-                                      color: isCurrent ? _neonColor : Colors.white,
+                                      color: isCurrent ? _accentColor : Colors.white,
                                       fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                                     ),
                                     maxLines: 1,
@@ -880,7 +881,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                         const Icon(Icons.favorite, color: Colors.redAccent, size: 16),
                                       const SizedBox(width: 4),
                                       if (isCurrent)
-                                        Icon(Icons.play_arrow, color: _neonColor),
+                                        Icon(Icons.play_arrow, color: _accentColor),
                                     ],
                                   ),
                                   onTap: () {
@@ -986,7 +987,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       ),
       title: Text('$minutes minutes', style: const TextStyle(color: Colors.white)),
       trailing: _sleepTimerActive && _sleepTimerMinutes == minutes
-          ? Icon(Icons.check_circle, color: _neonColor)
+          ? Icon(Icons.check_circle, color: _accentColor)
           : null,
       onTap: () {
         _startSleepTimer(minutes);
@@ -1020,7 +1021,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('${result.files.length} songs added'),
-              backgroundColor: _neonColor.withOpacity(0.3),
+              backgroundColor: _accentColor.withOpacity(0.3),
               duration: const Duration(seconds: 1),
             ),
           );
@@ -1278,7 +1279,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   Text(
                     title,
                     style: TextStyle(
-                      color: isActive ? _neonColor : Colors.white,
+                      color: isActive ? _accentColor : Colors.white,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1291,7 +1292,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               ),
             ),
             if (isActive)
-              Icon(Icons.check_circle, color: _neonColor, size: 20),
+              Icon(Icons.check_circle, color: _accentColor, size: 20),
           ],
         ),
       ),
@@ -1309,6 +1310,117 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
+  // GRADIENT ICON HELPER
+  // ============================================================
+  Widget _buildGradientIcon(IconData icon, double size, List<Color> gradient) {
+    return ShaderMask(
+      shaderCallback: (bounds) => LinearGradient(
+        colors: gradient,
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(bounds),
+      child: Icon(icon, color: Colors.white, size: size),
+    );
+  }
+
+  // ============================================================
+  // MIUI SONG TILE
+  // ============================================================
+  Widget _buildMiuiSongTile({
+    required String title,
+    required String subtitle,
+    required List<Color> gradient,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: _cardColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: ListTile(
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              title.substring(0, 1).toUpperCase(),
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(color: _textSecondary, fontSize: 12),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: trailing,
+        onTap: onTap,
+      ),
+    );
+  }
+
+  // ============================================================
+  // ACTION BUTTON
+  // ============================================================
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required Color activeColor,
+    required double size,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isActive ? activeColor.withOpacity(0.15) : _cardColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isActive ? activeColor : Colors.grey.shade800,
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: isActive ? activeColor : Colors.white54,
+              size: size,
+            ),
+          ),
+          if (label.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? activeColor : Colors.white54,
+                fontSize: 9,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
   // BODY CONTENT
   // ============================================================
   Widget _buildBodyContent() {
@@ -1322,7 +1434,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return _buildPlayerUI();
   }
 
-  // ===== FAVORITES TAB =====
+  // ============================================================
+  // FAVORITES TAB
+  // ============================================================
   Widget _buildFavoritesTab() {
     if (_favorites.isEmpty) {
       return Center(
@@ -1345,7 +1459,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         final song = _favorites[index];
         String cleanName = _cleanSongName(song.name);
         List<Color> gradient = _getSongGradient(index);
-        return _buildSongTile(
+        return _buildMiuiSongTile(
           title: cleanName,
           subtitle: '${index + 1}',
           gradient: gradient,
@@ -1362,7 +1476,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ===== RECENT TAB =====
+  // ============================================================
+  // RECENT TAB
+  // ============================================================
   Widget _buildRecentTab() {
     if (_recent.isEmpty) {
       return Center(
@@ -1383,18 +1499,20 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         final song = _recent[index];
         String cleanName = _cleanSongName(song.name);
         List<Color> gradient = _getSongGradient(index);
-        return _buildSongTile(
+        return _buildMiuiSongTile(
           title: cleanName,
           subtitle: 'Recently played',
           gradient: gradient,
-          trailing: Text('${index + 1}', style: const TextStyle(color: Colors.white24, fontSize: 12)),
+          trailing: Text('${index + 1}', style: TextStyle(color: _textSecondary, fontSize: 12)),
           onTap: () => _playSpecificSong(song),
         );
       },
     );
   }
 
-  // ===== PLAYLISTS TAB =====
+  // ============================================================
+  // PLAYLISTS TAB - MIUI STYLE
+  // ============================================================
   Widget _buildPlaylistsTab() {
     return Column(
       children: [
@@ -1408,7 +1526,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             child: ElevatedButton.icon(
               onPressed: _showCreatePlaylistDialog,
               icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text('Create New Playlist', style: TextStyle(color: Colors.white)),
+              label: const Text('Create New Playlist', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 foregroundColor: Colors.white,
@@ -1451,7 +1569,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         ),
                         subtitle: Text(
                           '${songs.length} songs',
-                          style: const TextStyle(color: Colors.white54),
+                          style: TextStyle(color: _textSecondary),
                         ),
                         leading: Container(
                           padding: const EdgeInsets.all(10),
@@ -1512,7 +1630,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 ),
                               ]
                             : songs.map((song) {
-                                return _buildSongTile(
+                                return _buildMiuiSongTile(
                                   title: _cleanSongName(song.name),
                                   subtitle: 'Tap to play',
                                   gradient: _getSongGradient(index),
@@ -1532,55 +1650,80 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ===== SONG TILE =====
-  Widget _buildSongTile({
-    required String title,
-    required String subtitle,
-    required List<Color> gradient,
-    Widget? trailing,
-    VoidCallback? onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: _cardColor,
-        borderRadius: BorderRadius.circular(14),
+  // ============================================================
+  // VOLUME POPUP
+  // ============================================================
+  void _showVolumePopup(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _bgColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: ListTile(
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Text(
-              title.substring(0, 1).toUpperCase(),
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(color: Colors.white54, fontSize: 12),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: trailing,
-        onTap: onTap,
-      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              height: 200,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _buildGradientIcon(Icons.volume_up, 24, _primaryGradient),
+                      const SizedBox(width: 12),
+                      const Text('Volume', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.volume_down, color: Colors.white54),
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderThemeData(
+                            trackHeight: 4,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                            activeTrackColor: _accentColor,
+                            inactiveTrackColor: Colors.grey.shade800,
+                            thumbColor: _accentColor,
+                          ),
+                          child: Slider(
+                            min: 0.0,
+                            max: 1.0,
+                            value: _volume,
+                            onChanged: (value) async {
+                              setModalState(() => _volume = value);
+                              setState(() => _volume = value);
+                              _baseVolume = value;
+                              await _audioPlayer.setVolume(value);
+                              await _applyEqualizer();
+                              _saveData();
+                            },
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.volume_up, color: Colors.white54),
+                    ],
+                  ),
+                  Center(
+                    child: Text(
+                      '${(_volume * 100).toInt()}%',
+                      style: TextStyle(color: _accentColor, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
   // ============================================================
-  // PLAYER UI - WITH THEME
+  // PLAYER UI - MIUI STYLE
   // ============================================================
   Widget _buildPlayerUI() {
     String currentSongName = _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].name) : "No song playing";
@@ -1592,108 +1735,216 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 4),
               
-              // Song Name
-              Text(
-                currentSongName,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 0.3,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              
-              const SizedBox(height: 2),
-              
-              Text(
-                hasSongs ? "Song ${_currentIndex + 1} of ${_playlist.length}" : "No songs",
-                style: TextStyle(fontSize: 12, color: Colors.white54),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Album Art
-              AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: isPlaying ? _pulseAnimation.value : 1.0,
-                    child: Stack(
-                      alignment: Alignment.center,
+              // ===== PLAYLIST HEADER (MIUI Style) =====
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
                       children: [
                         Container(
-                          height: 180,
-                          width: 180,
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
                             gradient: LinearGradient(colors: currentGradient),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _neonColor.withOpacity(0.3),
-                                blurRadius: 30,
-                                spreadRadius: 5,
-                              ),
-                            ],
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Center(
-                            child: hasSongs
-                                ? Text(
-                                    _cleanSongName(_playlist[_currentIndex].name).substring(0, 1).toUpperCase(),
-                                    style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white),
-                                  )
-                                : const Icon(Icons.music_note_rounded, size: 60, color: Colors.white),
-                          ),
+                          child: const Icon(Icons.playlist_play, color: Colors.white, size: 18),
                         ),
-                        if (_sleepTimerActive)
-                          Positioned(
-                            top: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(color: Color(0xFFFF9F43), shape: BoxShape.circle),
-                              child: const Icon(Icons.timer, color: Colors.white, size: 14),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hasSongs ? "Queue" : "No Songs",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        Positioned(
-                          bottom: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: _neonColor.withOpacity(0.3), width: 1),
+                            Text(
+                              hasSongs 
+                                  ? "${_playlist.length} Tracks · ${_getTotalDuration()} Total Duration" 
+                                  : "Add songs to play",
+                              style: TextStyle(
+                                color: _textSecondary,
+                                fontSize: 11,
+                              ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(isPlaying ? Icons.play_arrow : Icons.pause, color: _neonColor, size: 12),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isPlaying ? 'Playing' : 'Paused',
-                                  style: TextStyle(color: _neonColor, fontSize: 10, fontWeight: FontWeight.w500),
-                                ),
-                              ],
-                            ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
-                  );
-                },
+                    // Favorites Button
+                    GestureDetector(
+                      onTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : null,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isCurrentFavorite ? Colors.red.withOpacity(0.15) : _cardColor,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isCurrentFavorite ? Colors.redAccent : Colors.grey.shade700,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isCurrentFavorite ? Icons.favorite : Icons.favorite_border,
+                              color: isCurrentFavorite ? Colors.redAccent : Colors.white54,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isCurrentFavorite ? 'Fav' : 'Add Fav',
+                              style: TextStyle(
+                                color: isCurrentFavorite ? Colors.redAccent : Colors.white54,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              
+              const SizedBox(height: 8),
+              
+              // ===== SONGS LIST (MIUI Style) =====
+              hasSongs
+                  ? ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _playlist.length > 5 ? 5 : _playlist.length,
+                      itemBuilder: (context, index) {
+                        final song = _playlist[index];
+                        String cleanName = _cleanSongName(song.name);
+                        List<Color> gradient = _getSongGradient(index);
+                        bool isCurrent = index == _currentIndex;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          decoration: BoxDecoration(
+                            color: isCurrent ? _accentColor.withOpacity(0.1) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: isCurrent ? Border.all(color: _accentColor.withOpacity(0.3), width: 1) : null,
+                          ),
+                          child: ListTile(
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(colors: gradient),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  cleanName.substring(0, 1).toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              cleanName,
+                              style: TextStyle(
+                                color: isCurrent ? _accentColor : Colors.white,
+                                fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                                fontSize: 14,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              "Local Audio",
+                              style: TextStyle(
+                                color: _textSecondary,
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: isCurrent
+                                ? Icon(Icons.play_arrow, color: _accentColor, size: 20)
+                                : const SizedBox(width: 20),
+                            onTap: () {
+                              setState(() => _currentIndex = index);
+                              _playCurrentSongInQueue();
+                              _saveData();
+                            },
+                          ),
+                        );
+                      },
+                    )
+                  : Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.music_note, size: 48, color: Colors.white24),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'No songs in queue',
+                            style: TextStyle(color: Colors.white54, fontSize: 14),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            onPressed: _pickSongs,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add Songs'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _accentColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
               
               const SizedBox(height: 12),
               
-              // Progress Bar
+              // ===== SHOW ALL BUTTON =====
+              if (_playlist.length > 5)
+                GestureDetector(
+                  onTap: _showQueueBottomSheet,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Show All ${_playlist.length} Songs',
+                          style: TextStyle(
+                            color: _accentColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios, color: _accentColor, size: 12),
+                      ],
+                    ),
+                  ),
+                ),
+              
+              const SizedBox(height: 8),
+              
+              // ===== PROGRESS BAR =====
               Column(
                 children: [
                   SliderTheme(
@@ -1701,9 +1952,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       trackHeight: 3,
                       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
                       overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
-                      activeTrackColor: _neonColor,
+                      activeTrackColor: _accentColor,
                       inactiveTrackColor: Colors.grey.shade800,
-                      thumbColor: _neonColor,
+                      thumbColor: _accentColor,
                     ),
                     child: Slider(
                       min: 0.0,
@@ -1719,8 +1970,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(_formatDuration(_position), style: TextStyle(color: Colors.white54, fontSize: 10)),
-                      Text(_formatDuration(_duration), style: TextStyle(color: Colors.white54, fontSize: 10)),
+                      Text(_formatDuration(_position), style: TextStyle(color: _textSecondary, fontSize: 10)),
+                      Text(_formatDuration(_duration), style: TextStyle(color: _textSecondary, fontSize: 10)),
                     ],
                   ),
                 ],
@@ -1728,11 +1979,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               
               const SizedBox(height: 8),
               
-              // Playback Controls
+              // ===== PLAYBACK CONTROLS =====
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Shuffle/Repeat Button
+                  // Shuffle/Repeat
                   GestureDetector(
                     onTap: () {
                       setState(() {
@@ -1750,23 +2001,23 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: (isShuffle || repeatMode > 0) ? _neonColor.withOpacity(0.15) : Colors.transparent,
+                        color: (isShuffle || repeatMode > 0) ? _accentColor.withOpacity(0.15) : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
-                        border: (isShuffle || repeatMode > 0) ? Border.all(color: _neonColor.withOpacity(0.3), width: 1) : null,
+                        border: (isShuffle || repeatMode > 0) ? Border.all(color: _accentColor.withOpacity(0.3), width: 1) : null,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             isShuffle ? Icons.shuffle : Icons.repeat,
-                            color: (isShuffle || repeatMode > 0) ? _neonColor : Colors.white54,
+                            color: (isShuffle || repeatMode > 0) ? _accentColor : Colors.white54,
                             size: 18,
                           ),
                           const SizedBox(width: 2),
                           Text(
                             isShuffle ? 'Shuffle' : (repeatMode == 1 ? '1' : (repeatMode == 2 ? 'All' : '')),
                             style: TextStyle(
-                              color: (isShuffle || repeatMode > 0) ? _neonColor : Colors.white54,
+                              color: (isShuffle || repeatMode > 0) ? _accentColor : Colors.white54,
                               fontSize: 9,
                             ),
                           ),
@@ -1794,7 +2045,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       gradient: LinearGradient(colors: currentGradient),
                       boxShadow: [
                         BoxShadow(
-                          color: _neonColor.withOpacity(0.3),
+                          color: _accentColor.withOpacity(0.3),
                           blurRadius: 15,
                           spreadRadius: 3,
                         ),
@@ -1820,7 +2071,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   
                   const SizedBox(width: 4),
                   
-                  // Queue Button
+                  // Queue
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(colors: _secondaryGradient),
@@ -1838,24 +2089,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               
               const SizedBox(height: 10),
               
-              // Bottom Action Row
+              // ===== BOTTOM ACTION ROW =====
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _buildActionButton(
-                    icon: isCurrentFavorite ? Icons.favorite : Icons.favorite_border,
-                    label: '',
-                    isActive: isCurrentFavorite,
-                    activeColor: Colors.red,
-                    size: 18,
-                    onTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : null,
-                  ),
-                  
-                  _buildActionButton(
                     icon: Icons.spatial_audio,
                     label: '3D',
                     isActive: is3DMode,
-                    activeColor: _neonColor,
+                    activeColor: _accentColor,
                     size: 18,
                     onTap: () async {
                       setState(() => is3DMode = !is3DMode);
@@ -1874,18 +2116,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     icon: Icons.equalizer,
                     label: _isEqActive ? 'EQ' : '',
                     isActive: _isEqActive,
-                    activeColor: _neonColor,
+                    activeColor: _accentColor,
                     size: 18,
                     onTap: () => _showEqualizerDialog(),
-                  ),
-                  
-                  _buildActionButton(
-                    icon: Icons.timer,
-                    label: _sleepTimerActive ? '${_sleepTimerMinutes}m' : '',
-                    isActive: _sleepTimerActive,
-                    activeColor: const Color(0xFFFF9F43),
-                    size: 18,
-                    onTap: () => _showSleepTimerDialog(),
                   ),
                   
                   _buildActionButton(
@@ -1896,6 +2129,24 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     size: 18,
                     onTap: () => _showVolumePopup(context),
                   ),
+                  
+                  _buildActionButton(
+                    icon: Icons.favorite,
+                    label: '',
+                    isActive: isCurrentFavorite,
+                    activeColor: Colors.red,
+                    size: 18,
+                    onTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : null,
+                  ),
+                  
+                  _buildActionButton(
+                    icon: Icons.timer,
+                    label: _sleepTimerActive ? '${_sleepTimerMinutes}m' : '',
+                    isActive: _sleepTimerActive,
+                    activeColor: const Color(0xFFFF9F43),
+                    size: 18,
+                    onTap: () => _showSleepTimerDialog(),
+                  ),
                 ],
               ),
               
@@ -1904,129 +2155,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           ),
         ),
       ),
-    );
-  }
-
-  // ===== ACTION BUTTON =====
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required Color activeColor,
-    required double size,
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: isActive ? activeColor.withOpacity(0.15) : _cardColor,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isActive ? activeColor : Colors.grey.shade800,
-                width: 1,
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: isActive ? activeColor : Colors.white54,
-              size: size,
-            ),
-          ),
-          if (label.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? activeColor : Colors.white54,
-                fontSize: 8,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ===== VOLUME POPUP =====
-  void _showVolumePopup(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: _bgColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.all(24),
-              height: 200,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: _primaryGradient),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.volume_up, color: Colors.white, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('Volume', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Icon(Icons.volume_down, color: Colors.white54),
-                      Expanded(
-                        child: SliderTheme(
-                          data: SliderThemeData(
-                            trackHeight: 4,
-                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                            activeTrackColor: _neonColor,
-                            inactiveTrackColor: Colors.grey.shade800,
-                            thumbColor: _neonColor,
-                          ),
-                          child: Slider(
-                            min: 0.0,
-                            max: 1.0,
-                            value: _volume,
-                            onChanged: (value) async {
-                              setModalState(() => _volume = value);
-                              setState(() => _volume = value);
-                              _baseVolume = value;
-                              await _audioPlayer.setVolume(value);
-                              await _applyEqualizer();
-                              _saveData();
-                            },
-                          ),
-                        ),
-                      ),
-                      const Icon(Icons.volume_up, color: Colors.white54),
-                    ],
-                  ),
-                  Center(
-                    child: Text(
-                      '${(_volume * 100).toInt()}%',
-                      style: TextStyle(color: _neonColor, fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -2048,14 +2176,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (_selectedIndex == 0) ...[
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: _primaryGradient),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.music_note, color: Colors.white, size: 18),
-              ),
+              _buildGradientIcon(Icons.music_note, 22, _primaryGradient),
               const SizedBox(width: 8),
             ],
             Text(
@@ -2073,14 +2194,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         actions: [
           if (_selectedIndex == 0) ...[
             IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: _secondaryGradient),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.add, color: Colors.white, size: 18),
-              ),
+              icon: _buildGradientIcon(Icons.add, 22, _secondaryGradient),
               onPressed: _pickSongs,
               tooltip: 'Add Songs',
             ),
@@ -2109,7 +2223,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   value: 'reset_eq',
                   child: Row(
                     children: [
-                      Icon(Icons.equalizer, color: Color(0xFF00E5FF), size: 20),
+                      Icon(Icons.equalizer, color: Color(0xFF6C63FF), size: 20),
                       SizedBox(width: 10),
                       Text('Reset Equalizer', style: TextStyle(color: Colors.white)),
                     ],
@@ -2124,7 +2238,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         backgroundColor: _cardColor,
-        selectedItemColor: _neonColor,
+        selectedItemColor: _accentColor,
         unselectedItemColor: Colors.white54,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
