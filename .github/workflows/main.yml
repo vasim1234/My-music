@@ -26,6 +26,10 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Create Android Project
+        run: |
+          flutter create --platforms=android --project-name=my_music --org=com.music.app .
+
       - name: Fix Android SDK version
         run: |
           sed -i 's/compileSdkVersion 35/compileSdkVersion 33/g' android/app/build.gradle || true
