@@ -66,7 +66,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // ============================================================
   final Color _bgColor = const Color(0xFF0F0F1A);
   final Color _cardColor = const Color(0xFF1A1A2E);
-  final Color _cardLight = const Color(0xFF2D2D44);
   final Color _accentColor = const Color(0xFF6C63FF);
   final Color _textPrimary = const Color(0xFFFFFFFF);
   final Color _textSecondary = const Color(0xFF8888AA);
@@ -118,7 +117,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   String _getTotalDuration() {
     Duration total = Duration.zero;
     for (var song in _playlist) {
-      // Since we don't have actual duration, we use estimated
       total += const Duration(minutes: 3, seconds: 30);
     }
     return _formatDuration(total);
@@ -1723,7 +1721,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // PLAYER UI - MIUI STYLE
+  // PLAYER UI - MIUI STYLE (FIXED)
   // ============================================================
   Widget _buildPlayerUI() {
     String currentSongName = _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].name) : "No song playing";
@@ -1769,6 +1767,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+                            // ===== FIXED: const HATAYA =====
                             Text(
                               hasSongs 
                                   ? "${_playlist.length} Tracks · ${_getTotalDuration()} Total Duration" 
@@ -1868,6 +1867,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            // ===== FIXED: const HATAYA =====
                             subtitle: Text(
                               "Local Audio",
                               style: TextStyle(
