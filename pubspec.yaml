@@ -9,10 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Audio Playback with EQ support
-  just_audio: ^0.9.36
-  audio_service: ^0.18.10
-  audio_session: ^0.1.17
+  audioplayers: ^5.2.1
   file_picker: ^6.1.1
   cupertino_icons: ^1.0.6
   shared_preferences: ^2.2.2
