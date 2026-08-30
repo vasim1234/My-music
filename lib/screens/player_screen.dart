@@ -397,7 +397,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   ),
                   const SizedBox(height: 16),
                   const Divider(color: Colors.white24),
-                  const Text('FREQUENCY BANDS', style: TextStyle(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+                  Text('FREQUENCY BANDS', style: TextStyle(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Expanded(
                     child: ListView.builder(
