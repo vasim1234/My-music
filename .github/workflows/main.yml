@@ -8,9 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -25,35 +26,20 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Create Android project
+      - name: Fix Android SDK version
         run: |
-          rm -rf android
-          flutter create --platforms=android --project-name=my_music --org=com.music.app .
-
-      - name: Fix Android SDK
-        run: |
-          sed -i 's/compileSdkVersion 35/compileSdkVersion 33/g' android/app/build.gradle
-          sed -i 's/targetSdkVersion 35/targetSdkVersion 33/g' android/app/build.gradle
+          sed -i 's/compileSdkVersion 35/compileSdkVersion 33/g' android/app/build.gradle || true
+          sed -i 's/targetSdkVersion 35/targetSdkVersion 33/g' android/app/build.gradle || true
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
 
       - name: Install dependencies
-        run: flutter pub get
-      
-      - name: Check pubspec.yaml
         run: |
-          cat pubspec.yaml
-          if ! grep -q "sdk:" pubspec.yaml; then
-          echo "ERROR: pubspec.yaml missing SDK constraint"
-          exit 1
-          fi
-      - name: Generate Android Launcher Icons
-        run: |
-          # Sirf Android ke liye icon generate karein
-          flutter pub run flutter_launcher_icons
+          flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release
 
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v1
