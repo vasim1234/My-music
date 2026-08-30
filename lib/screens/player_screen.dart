@@ -22,7 +22,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   bool isShuffle = false;
   int repeatMode = 0;
   
-  List<PlatformFile> _playlist = [];
+  // ===== MASTER LIST - All songs safe =====
+  List<PlatformFile> _masterList = [];
+  List<PlatformFile> _playlist = []; // Current queue
   List<PlatformFile> _favorites = [];
   List<PlatformFile> _recent = [];
   int _currentIndex = 0;
@@ -40,8 +42,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   bool _sleepTimerActive = false;
   int _sleepTimerMinutes = 0;
 
+  // ===== CUSTOM PLAYLISTS =====
   Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
+  String? _currentEditingPlaylist;
 
   // Equalizer
   bool _isEqActive = false;
@@ -375,6 +379,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     try {
       final prefs = await SharedPreferences.getInstance();
       
+      // Save Master List
+      List<String> masterPaths = _masterList.map((f) => f.path ?? '').toList();
+      await prefs.setStringList('masterList', masterPaths);
+      
+      // Save Queue
       List<String> playlistPaths = _playlist.map((f) => f.path ?? '').toList();
       await prefs.setStringList('playlist', playlistPaths);
       
@@ -393,6 +402,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       await prefs.setBool('isShuffle', isShuffle);
       await prefs.setInt('repeatMode', repeatMode);
       
+      // Save Custom Playlists
       Map<String, List<String>> playlistMap = {};
       _customPlaylists.forEach((key, value) {
         playlistMap[key] = value.map((f) => f.path ?? '').toList();
@@ -408,6 +418,20 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     try {
       final prefs = await SharedPreferences.getInstance();
       
+      // Load Master List
+      List<String>? masterPaths = prefs.getStringList('masterList');
+      if (masterPaths != null && masterPaths.isNotEmpty) {
+        _masterList = masterPaths
+            .where((path) => File(path).existsSync())
+            .map((path) => PlatformFile(
+                  name: path.split('/').last,
+                  path: path,
+                  size: 0,
+                ))
+            .toList();
+      }
+      
+      // Load Queue
       List<String>? playlistPaths = prefs.getStringList('playlist');
       if (playlistPaths != null && playlistPaths.isNotEmpty) {
         _playlist = playlistPaths
@@ -463,6 +487,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       isShuffle = prefs.getBool('isShuffle') ?? false;
       repeatMode = prefs.getInt('repeatMode') ?? 0;
       
+      // Load Custom Playlists
       String? playlistJson = prefs.getString('customPlaylists');
       if (playlistJson != null) {
         Map<String, dynamic> decoded = jsonDecode(playlistJson);
@@ -477,6 +502,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   ))
               .toList();
         });
+      }
+      
+      // If no master list, create from current playlist
+      if (_masterList.isEmpty && _playlist.isNotEmpty) {
+        _masterList = List.from(_playlist);
       }
       
       if (_playlist.isNotEmpty && _currentIndex < _playlist.length) {
@@ -504,7 +534,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // PLAYLIST FUNCTIONS
+  // PLAYLIST FUNCTIONS - Fixed
   // ============================================================
   void _createPlaylist(String name) {
     if (name.trim().isEmpty) return;
@@ -580,18 +610,36 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
+  // ============================================================
+  // ADD SONGS TO PLAYLIST - From Master List
+  // ============================================================
   void _showAddToPlaylistDialog(String playlistName) {
-    List<PlatformFile> availableSongs = _playlist.where((song) =>
+    // Master list se songs dikhao, jo already playlist mein hain unko filter karo
+    List<PlatformFile> availableSongs = _masterList.where((song) =>
       !_customPlaylists[playlistName]!.contains(song)
     ).toList();
 
-    if (availableSongs.isEmpty) {
+    if (_masterList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No songs available'), backgroundColor: Colors.grey),
+        const SnackBar(
+          content: Text('No songs in master list. Add songs first!'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
 
+    if (availableSongs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All songs already in this playlist!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      return;
+    }
+
+    // Show selection dialog
     showModalBottomSheet(
       context: context,
       backgroundColor: _bgColor,
@@ -602,9 +650,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            // Track selected songs
+            List<PlatformFile> selectedSongs = [];
+            
             return Container(
               padding: const EdgeInsets.all(20),
-              height: MediaQuery.of(context).size.height * 0.6,
+              height: MediaQuery.of(context).size.height * 0.7,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -622,7 +673,22 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             child: const Icon(Icons.playlist_add, color: Colors.white, size: 20),
                           ),
                           const SizedBox(width: 10),
-                          Text('Add to $playlistName', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text(
+                            'Add to $playlistName',
+                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _accentColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${availableSongs.length} available',
+                              style: TextStyle(color: _accentColor, fontSize: 12),
+                            ),
+                          ),
                         ],
                       ),
                       IconButton(
@@ -633,6 +699,63 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   ),
                   const Divider(color: Colors.white24),
                   const SizedBox(height: 8),
+                  
+                  // Select All Button
+                  if (availableSongs.isNotEmpty)
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: selectedSongs.length == availableSongs.length,
+                          onChanged: (value) {
+                            setModalState(() {
+                              if (value == true) {
+                                selectedSongs = List.from(availableSongs);
+                              } else {
+                                selectedSongs.clear();
+                              }
+                            });
+                          },
+                          activeColor: _accentColor,
+                        ),
+                        Text(
+                          'Select All (${availableSongs.length})',
+                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                        const Spacer(),
+                        // Add Selected Button
+                        if (selectedSongs.isNotEmpty)
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(colors: _primaryGradient),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: ElevatedButton(
+                              onPressed: () {
+                                for (var song in selectedSongs) {
+                                  _addSongToPlaylist(playlistName, song);
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('${selectedSongs.length} songs added to $playlistName'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                                Navigator.pop(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                foregroundColor: Colors.white,
+                                shadowColor: Colors.transparent,
+                              ),
+                              child: Text('Add ${selectedSongs.length} Songs'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  // Song List
                   Expanded(
                     child: ListView.builder(
                       itemCount: availableSongs.length,
@@ -640,10 +763,31 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         final song = availableSongs[index];
                         String cleanName = _cleanSongName(song.name);
                         List<Color> gradient = _getSongGradient(index);
+                        bool isSelected = selectedSongs.contains(song);
+                        
                         return Container(
                           margin: const EdgeInsets.only(bottom: 6),
-                          decoration: BoxDecoration(color: _cardColor, borderRadius: BorderRadius.circular(12)),
+                          decoration: BoxDecoration(
+                            color: isSelected ? _accentColor.withOpacity(0.1) : _cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: isSelected 
+                                ? Border.all(color: _accentColor.withOpacity(0.5), width: 1.5) 
+                                : null,
+                          ),
                           child: ListTile(
+                            leading: Checkbox(
+                              value: isSelected,
+                              onChanged: (value) {
+                                setModalState(() {
+                                  if (value == true) {
+                                    selectedSongs.add(song);
+                                  } else {
+                                    selectedSongs.remove(song);
+                                  }
+                                });
+                              },
+                              activeColor: _accentColor,
+                            ),
                             leading: Container(
                               width: 40,
                               height: 40,
@@ -658,19 +802,35 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 ),
                               ),
                             ),
-                            title: Text(cleanName, style: const TextStyle(color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            trailing: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(colors: _primaryGradient),
-                                borderRadius: BorderRadius.circular(8),
+                            title: Text(
+                              cleanName,
+                              style: TextStyle(
+                                color: isSelected ? _accentColor : Colors.white,
                               ),
-                              child: const Icon(Icons.add, color: Colors.white, size: 18),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: Checkbox(
+                              value: isSelected,
+                              onChanged: (value) {
+                                setModalState(() {
+                                  if (value == true) {
+                                    selectedSongs.add(song);
+                                  } else {
+                                    selectedSongs.remove(song);
+                                  }
+                                });
+                              },
+                              activeColor: _accentColor,
                             ),
                             onTap: () {
-                              _addSongToPlaylist(playlistName, song);
-                              setModalState(() { availableSongs.remove(song); });
-                              if (availableSongs.isEmpty) Navigator.pop(context);
+                              setModalState(() {
+                                if (isSelected) {
+                                  selectedSongs.remove(song);
+                                } else {
+                                  selectedSongs.add(song);
+                                }
+                              });
                             },
                           ),
                         );
@@ -687,6 +847,49 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
+  // MASTER LIST - Add Songs
+  // ============================================================
+  Future<void> _pickSongs() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.audio,
+        allowMultiple: true,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        setState(() {
+          // Add to Master List
+          _masterList.addAll(result.files);
+          // Also add to queue if empty
+          if (_playlist.isEmpty) {
+            _playlist.addAll(result.files);
+            _currentIndex = 0;
+          }
+        });
+        _saveData();
+        if (_playlist.isNotEmpty && !isPlaying) {
+          await _playCurrentSongInQueue();
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${result.files.length} songs added to master list'),
+              backgroundColor: _accentColor.withOpacity(0.3),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Color(0xFFFF6B6B)),
+        );
+      }
+    }
+  }
+
+  // ============================================================
   // QUEUE MANAGEMENT
   // ============================================================
   void _clearQueue() {
@@ -696,7 +899,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         backgroundColor: _cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Clear Queue?', style: TextStyle(color: Colors.white)),
-        content: const Text('Remove all songs from queue?', style: TextStyle(color: Colors.white70)),
+        content: const Text('Remove all songs from queue? (Master list will remain)', style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -969,43 +1172,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // ============================================================
   // AUDIO PLAYBACK
   // ============================================================
-  Future<void> _pickSongs() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.audio,
-        allowMultiple: true,
-      );
-
-      if (result != null && result.files.isNotEmpty) {
-        setState(() {
-          _playlist.addAll(result.files);
-          if (_playlist.length == result.files.length) {
-            _currentIndex = 0;
-          }
-        });
-        _saveData();
-        if (_playlist.isNotEmpty && !isPlaying) {
-          await _playCurrentSongInQueue();
-        }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${result.files.length} songs added'),
-              backgroundColor: _accentColor.withOpacity(0.3),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Color(0xFFFF6B6B)),
-        );
-      }
-    }
-  }
-
   Future<void> _playCurrentSongInQueue() async {
     if (_playlist.isEmpty) return;
     
@@ -1036,7 +1202,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // FIX: Playlist Song Sequence Bug
+  // PLAY SPECIFIC SONG - With Queue Replace
   // ============================================================
   Future<void> _playSpecificSong(PlatformFile song, {List<PlatformFile>? playlist}) async {
     // Agar playlist provide ki gayi hai toh queue REPLACE karein
@@ -1047,7 +1213,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         if (_currentIndex == -1) _currentIndex = 0;
       });
     } else {
-      // Normal flow (jaise pehle tha)
+      // Normal flow
       int index = _playlist.indexOf(song);
       if (index != -1) {
         setState(() => _currentIndex = index);
@@ -1409,11 +1575,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // PLAYLISTS TAB (UPDATED with Queue Replace)
+  // PLAYLISTS TAB - FIXED
   // ============================================================
   Widget _buildPlaylistsTab() {
     return Column(
       children: [
+        // Create Playlist Button
         Padding(
           padding: const EdgeInsets.all(16),
           child: Container(
@@ -1436,6 +1603,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             ),
           ),
         ),
+        
+        // Playlists List
         Expanded(
           child: _customPlaylists.isEmpty
               ? Center(
@@ -1474,6 +1643,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Add Songs Button
                             Container(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(colors: _secondaryGradient),
@@ -1482,8 +1652,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               child: IconButton(
                                 icon: const Icon(Icons.add, color: Colors.white, size: 20),
                                 onPressed: () => _showAddToPlaylistDialog(playlistName),
+                                tooltip: 'Add songs from master list',
                               ),
                             ),
+                            // Delete Playlist Button
                             IconButton(
                               icon: const Icon(Icons.delete_outline, color: Colors.red),
                               onPressed: () => _deletePlaylist(playlistName),
@@ -1506,7 +1678,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                         child: ElevatedButton.icon(
                                           onPressed: () => _showAddToPlaylistDialog(playlistName),
                                           icon: const Icon(Icons.add, size: 16, color: Colors.white),
-                                          label: const Text('Add Songs', style: TextStyle(color: Colors.white)),
+                                          label: const Text('Add Songs from Master List', style: TextStyle(color: Colors.white)),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.transparent,
                                             foregroundColor: Colors.white,
@@ -1544,7 +1716,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                       icon: const Icon(Icons.close, color: Colors.white54, size: 18),
                                       onPressed: () => _removeFromPlaylist(playlistName, song),
                                     ),
-                                    // ===== FIX: Playlist se song play karne par queue replace =====
                                     onTap: () => _playSpecificSong(song, playlist: songs),
                                   ),
                                 );
@@ -1990,7 +2161,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             IconButton(
               icon: const Icon(Icons.add, color: Colors.white70),
               onPressed: _pickSongs,
-              tooltip: 'Add Songs',
+              tooltip: 'Add Songs to Master List',
             ),
             PopupMenuButton(
               icon: const Icon(Icons.more_vert, color: Colors.white70),
