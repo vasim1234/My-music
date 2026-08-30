@@ -3,14 +3,16 @@ description: A 3D Music Player App
 publish_to: 'none'
 version: 1.0.0+1
 
-# ===== FIX: Add SDK constraint =====
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  audioplayers: ^5.2.1
+  # Audio Playback with EQ support
+  just_audio: ^0.9.36
+  audio_service: ^0.18.10
+  audio_session: ^0.1.17
   file_picker: ^6.1.1
   cupertino_icons: ^1.0.6
   shared_preferences: ^2.2.2
