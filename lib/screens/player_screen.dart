@@ -6,11 +6,11 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Import UI Components
-import 'widgets/album_art.dart';
-import 'widgets/playback_controls.dart';
-import 'widgets/action_buttons.dart';
-import 'widgets/playback_menu.dart';
+// ===== FIXED: Sahi import path =====
+import '../widgets/album_art.dart';
+import '../widgets/playback_controls.dart';
+import '../widgets/action_buttons.dart';
+import '../widgets/playback_menu.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -993,7 +993,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // AUDIO PLAYBACK - FIX 2: Playlist Sequence
+  // AUDIO PLAYBACK
   // ============================================================
   Future<void> _pickSongs() async {
     try {
@@ -1061,7 +1061,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
-  // FIX 2: Playlist Sequence - Song index sahi se set ho
   Future<void> _playSpecificSong(PlatformFile song) async {
     int index = _playlist.indexOf(song);
     if (index != -1) {
@@ -1158,7 +1157,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // SHUFFLE/REPEAT MENU - FIX 3: Full visibility
+  // SHUFFLE/REPEAT MENU
   // ============================================================
   void _showShuffleRepeatMenu() {
     showModalBottomSheet(
@@ -1167,11 +1166,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      isScrollControlled: true,  // FIX 3: Full screen height
+      isScrollControlled: true,
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(24),
-          height: 300,  // FIX 3: Increased height
+          height: 300,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1697,7 +1696,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // PLAYER UI - FIX 1: Shifted Up
+  // PLAYER UI
   // ============================================================
   Widget _buildPlayerUI() {
     String currentSongName = _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].name) : "No song playing";
@@ -1710,9 +1709,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,  // FIX 1: Center → Start
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),  // FIX 1: Kam space
+            const SizedBox(height: 16),
             
             // ===== SONG NAME =====
             Text(
@@ -1742,114 +1741,19 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               overflow: TextOverflow.ellipsis,
             ),
             
-            const SizedBox(height: 20),  // FIX 1: Kam space
+            const SizedBox(height: 20),
             
             // ===== ALBUM ART =====
-            Center(
-              child: AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: isPlaying ? _pulseAnimation.value : 1.0,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          height: 200,  // FIX 1: Chhota
-                          width: 200,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(colors: currentGradient),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _accentColor.withOpacity(0.3),
-                                blurRadius: 35,
-                                spreadRadius: 6,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          height: 180,  // FIX 1: Chhota
-                          width: 180,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: currentGradient,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: Center(
-                            child: hasSongs
-                                ? Text(
-                                    _cleanSongName(_playlist[_currentIndex].name)
-                                        .substring(0, 1)
-                                        .toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 56,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.music_note_rounded,
-                                    size: 60,
-                                    color: Colors.white,
-                                  ),
-                          ),
-                        ),
-                        if (_sleepTimerActive)
-                          Positioned(
-                            top: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(5),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFFF9F43),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.timer, color: Colors.white, size: 12),
-                            ),
-                          ),
-                        Positioned(
-                          bottom: 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: _accentColor.withOpacity(0.3), width: 1),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isPlaying ? Icons.play_arrow : Icons.pause,
-                                  color: _accentColor,
-                                  size: 11,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isPlaying ? 'Playing' : 'Paused',
-                                  style: TextStyle(
-                                    color: _accentColor,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+            AlbumArt(
+              isPlaying: isPlaying,
+              is3DMode: is3DMode,
+              songName: currentSongName,
+              gradient: currentGradient,
+              isSleepTimerActive: _sleepTimerActive,
+              animation: _pulseAnimation,
             ),
             
-            const SizedBox(height: 20),  // FIX 1: Kam space
+            const SizedBox(height: 20),
             
             // ===== PROGRESS BAR =====
             Column(
@@ -1884,227 +1788,66 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               ],
             ),
             
-            const SizedBox(height: 14),  // FIX 1: Kam space
+            const SizedBox(height: 14),
             
             // ===== PLAYBACK CONTROLS =====
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Shuffle/Repeat - Quick Access
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (isShuffle) {
-                        isShuffle = false;
-                        repeatMode = (repeatMode + 1) % 3;
-                      } else {
-                        isShuffle = true;
-                        repeatMode = 0;
-                      }
-                    });
-                    _saveData();
-                  },
-                  onLongPress: _showShuffleRepeatMenu,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: (isShuffle || repeatMode > 0) ? _accentColor.withOpacity(0.15) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(6),
-                      border: (isShuffle || repeatMode > 0) ? Border.all(color: _accentColor.withOpacity(0.3), width: 1) : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isShuffle ? Icons.shuffle : Icons.repeat,
-                          color: (isShuffle || repeatMode > 0) ? _accentColor : Colors.white54,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          isShuffle ? 'Shuffle' : (repeatMode == 1 ? '1' : (repeatMode == 2 ? 'All' : '')),
-                          style: TextStyle(
-                            color: (isShuffle || repeatMode > 0) ? _accentColor : Colors.white54,
-                            fontSize: 8,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(width: 4),
-                
-                // Previous
-                IconButton(
-                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 24),
-                  onPressed: hasSongs ? _playPreviousSong : null,
-                  padding: const EdgeInsets.all(4),
-                ),
-                
-                const SizedBox(width: 4),
-                
-                // Play/Pause
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: currentGradient),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _accentColor.withOpacity(0.35),
-                        blurRadius: 15,
-                        spreadRadius: 3,
-                      ),
-                    ],
-                  ),
-                  child: IconButton(
-                    icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
-                    iconSize: 30,
-                    onPressed: _togglePlayPause,
-                    padding: const EdgeInsets.all(12),
-                  ),
-                ),
-                
-                const SizedBox(width: 4),
-                
-                // Next
-                IconButton(
-                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 24),
-                  onPressed: hasSongs ? _playNextSong : null,
-                  padding: const EdgeInsets.all(4),
-                ),
-                
-                const SizedBox(width: 4),
-                
-                // Queue Button
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: _secondaryGradient),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.queue_music, color: Colors.white, size: 18),
-                    onPressed: _showQueueBottomSheet,
-                    padding: const EdgeInsets.all(6),
-                  ),
-                ),
-              ],
+            PlaybackControls(
+              isShuffle: isShuffle,
+              repeatMode: repeatMode,
+              onShuffleRepeatToggle: () {
+                setState(() {
+                  if (isShuffle) {
+                    isShuffle = false;
+                    repeatMode = (repeatMode + 1) % 3;
+                  } else {
+                    isShuffle = true;
+                    repeatMode = 0;
+                  }
+                });
+                _saveData();
+              },
+              onShuffleRepeatLongPress: _showShuffleRepeatMenu,
+              onPrevious: hasSongs ? _playPreviousSong : () {},
+              onPlayPause: _togglePlayPause,
+              onNext: hasSongs ? _playNextSong : () {},
+              onQueue: _showQueueBottomSheet,
+              isPlaying: isPlaying,
+              gradient: currentGradient,
             ),
             
-            const SizedBox(height: 14),  // FIX 1: Kam space
+            const SizedBox(height: 14),
             
             // ============================================================
-            // BOTTOM ACTION ROW - 5 Icons
+            // BOTTOM ACTION ROW
             // ============================================================
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildActionButton(
-                  icon: Icons.spatial_audio,
-                  label: '3D',
-                  isActive: is3DMode,
-                  activeColor: _accentColor,
-                  size: 18,
-                  onTap: () async {
-                    setState(() => is3DMode = !is3DMode);
-                    if (is3DMode) {
-                      await _audioPlayer.setBalance(0.5);
-                      await _audioPlayer.setVolume(0.9);
-                    } else {
-                      await _audioPlayer.setBalance(0.0);
-                      await _audioPlayer.setVolume(_volume);
-                    }
-                    _saveData();
-                  },
-                ),
-                
-                _buildActionButton(
-                  icon: Icons.equalizer,
-                  label: 'EQ',
-                  isActive: _isEqActive,
-                  activeColor: _accentColor,
-                  size: 18,
-                  onTap: () => _showEqualizerDialog(),
-                ),
-                
-                _buildActionButton(
-                  icon: Icons.volume_up,
-                  label: 'Volume',
-                  isActive: false,
-                  activeColor: Colors.white,
-                  size: 18,
-                  onTap: () => _showVolumePopup(context),
-                ),
-                
-                _buildActionButton(
-                  icon: isCurrentFavorite ? Icons.favorite : Icons.favorite_border,
-                  label: isCurrentFavorite ? 'Liked' : 'Heart',
-                  isActive: isCurrentFavorite,
-                  activeColor: Colors.red,
-                  size: 18,
-                  onTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : null,
-                ),
-                
-                _buildActionButton(
-                  icon: Icons.timer,
-                  label: _sleepTimerActive ? '${_sleepTimerMinutes}m' : 'Timer',
-                  isActive: _sleepTimerActive,
-                  activeColor: const Color(0xFFFF9F43),
-                  size: 18,
-                  onTap: () => _showSleepTimerDialog(),
-                ),
-              ],
+            ActionButtons(
+              is3DMode: is3DMode,
+              isEqActive: _isEqActive,
+              isCurrentFavorite: isCurrentFavorite,
+              isSleepTimerActive: _sleepTimerActive,
+              sleepTimerMinutes: _sleepTimerMinutes,
+              volume: _volume,
+              on3DToggle: () async {
+                setState(() => is3DMode = !is3DMode);
+                if (is3DMode) {
+                  await _audioPlayer.setBalance(0.5);
+                  await _audioPlayer.setVolume(0.9);
+                } else {
+                  await _audioPlayer.setBalance(0.0);
+                  await _audioPlayer.setVolume(_volume);
+                }
+                _saveData();
+              },
+              onEQTap: _showEqualizerDialog,
+              onVolumeTap: () => _showVolumePopup(context),
+              onFavoriteTap: hasSongs ? () => _toggleFavorite(_playlist[_currentIndex]) : () {},
+              onTimerTap: _showSleepTimerDialog,
+              accentColor: _accentColor,
             ),
             
             const SizedBox(height: 10),
           ],
         ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // ACTION BUTTON - Small & Clean
-  // ============================================================
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required Color activeColor,
-    required double size,
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isActive ? activeColor.withOpacity(0.15) : _cardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isActive ? activeColor : Colors.grey.shade800,
-                width: 1,
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: isActive ? activeColor : Colors.white54,
-              size: size,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            style: TextStyle(
-              color: isActive ? activeColor : _textSecondary,
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }
