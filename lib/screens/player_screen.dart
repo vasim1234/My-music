@@ -2,7 +2,9 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,15 +18,15 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  late AudioPlayer _audioPlayer;
   bool isPlaying = false;
   bool is3DMode = false;
   bool isShuffle = false;
   int repeatMode = 0;
   
-  List<PlatformFile> _playlist = [];
-  List<PlatformFile> _favorites = [];
-  List<PlatformFile> _recent = [];
+  List<File> _playlist = [];
+  List<File> _favorites = [];
+  List<File> _recent = [];
   int _currentIndex = 0;
 
   Duration _duration = Duration.zero;
@@ -40,35 +42,37 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   bool _sleepTimerActive = false;
   int _sleepTimerMinutes = 0;
 
-  Map<String, List<PlatformFile>> _customPlaylists = {};
+  Map<String, List<File>> _customPlaylists = {};
   String _newPlaylistName = '';
 
   // ============================================================
-  // SIMULATED EQUALIZER - Works with audioplayers
+  // REAL EQUALIZER - Using just_audio's built-in EQ
   // ============================================================
-  String _currentEqPreset = 'Normal';
   bool _isEqActive = false;
+  String _currentEqPreset = 'Normal';
   
-  // 3 Band EQ (Bass, Mid, Treble) - Simulated using balance + volume
-  final List<String> _bandLabels = ['Bass', 'Mid', 'Treble'];
+  // 10 Band Equalizer frequencies
+  final List<String> _bandLabels = [
+    '31Hz', '62Hz', '125Hz', '250Hz', '500Hz',
+    '1kHz', '2kHz', '4kHz', '8kHz', '16kHz'
+  ];
   
-  // Presets (Values in range -10 to +10)
+  // Presets (Gain in decibels - range: -15 to +15 dB)
   final Map<String, List<double>> _eqPresets = {
-    'Normal': [0, 0, 0],
-    'Bass Boost': [8, 0, -4],
-    'Treble Boost': [-4, 0, 8],
-    'Pop': [3, 0, 3],
-    'Rock': [5, 2, 4],
-    'Classical': [-2, 1, 5],
-    'Jazz': [4, 1, 3],
-    'Vocal': [0, 4, 0],
-    'Hip Hop': [6, -1, -2],
-    'Electronic': [4, 0, 5],
-    'Custom': [0, 0, 0],
+    'Normal': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    'Bass Boost': [6, 5, 4, 2, 0, -1, -2, -2, -1, 0],
+    'Treble Boost': [0, -1, -2, -1, 0, 2, 4, 5, 6, 6],
+    'Pop': [2, 3, 2, 1, 0, 1, 2, 3, 2, 1],
+    'Rock': [4, 3, 2, 1, 0, 1, 2, 3, 4, 5],
+    'Classical': [-1, -1, 0, 0, 1, 2, 3, 4, 5, 4],
+    'Jazz': [3, 4, 3, 2, 0, 1, 2, 3, 4, 3],
+    'Vocal': [0, 0, 1, 2, 3, 2, 1, 0, 0, 0],
+    'Hip Hop': [4, 5, 4, 2, 0, -1, -1, 0, 1, 2],
+    'Electronic': [3, 4, 3, 2, 0, 1, 2, 3, 4, 5],
+    'Custom': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   };
   
-  List<double> _currentEqValues = [0, 0, 0];
-  double _baseVolume = 1.0;
+  List<double> _currentEqValues = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
   // ============================================================
   // THEME COLORS
@@ -127,6 +131,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     
+    _audioPlayer = AudioPlayer();
+    
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -137,17 +143,20 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
 
     _loadSavedData();
+    _initAudioSession();
 
-    _audioPlayer.onDurationChanged.listen((newDuration) {
-      if (mounted) setState(() => _duration = newDuration);
+    _audioPlayer.durationStream.listen((newDuration) {
+      if (mounted) setState(() => _duration = newDuration ?? Duration.zero);
     });
     
-    _audioPlayer.onPositionChanged.listen((newPosition) {
+    _audioPlayer.positionStream.listen((newPosition) {
       if (mounted) setState(() => _position = newPosition);
     });
     
-    _audioPlayer.onPlayerComplete.listen((_) {
-      _handleSongCompletion();
+    _audioPlayer.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) {
+        _handleSongCompletion();
+      }
     });
   }
 
@@ -161,33 +170,45 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // SIMULATED EQUALIZER FUNCTIONS - Real audio effect
+  // INIT AUDIO SESSION (For Android Native EQ)
+  // ============================================================
+  Future<void> _initAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(AudioSessionConfiguration.music());
+      debugPrint('✅ Audio session configured');
+    } catch (e) {
+      debugPrint('❌ Audio session error: $e');
+    }
+  }
+
+  // ============================================================
+  // REAL EQUALIZER FUNCTIONS - Using just_audio's setBandLevel
   // ============================================================
   Future<void> _applyEqualizer() async {
-    if (!_isEqActive) {
-      await _audioPlayer.setBalance(0.0);
-      await _audioPlayer.setVolume(_baseVolume);
-      return;
+    try {
+      if (!_isEqActive) {
+        // Reset EQ if disabled
+        for (int i = 0; i < 10; i++) {
+          await _audioPlayer.setBandLevel(i, 0);
+        }
+        return;
+      }
+      
+      // Apply each band gain
+      for (int i = 0; i < 10; i++) {
+        await _audioPlayer.setBandLevel(i, _currentEqValues[i]);
+      }
+      debugPrint('✅ EQ applied: ${_currentEqValues}');
+    } catch (e) {
+      debugPrint('❌ EQ apply error: $e');
     }
-    
-    double bass = _currentEqValues[0];
-    double mid = _currentEqValues[1];
-    double treble = _currentEqValues[2];
-    
-    // Simulate EQ using balance and volume
-    // Bass boost = shift balance to left (more low frequencies)
-    // Treble boost = shift balance to right (more high frequencies)
-    double balanceEffect = (treble - bass) * 0.04;
-    double volumeEffect = 1.0 + (bass + mid + treble) * 0.015;
-    
-    await _audioPlayer.setBalance(balanceEffect.clamp(-1.0, 1.0));
-    await _audioPlayer.setVolume((_baseVolume * volumeEffect).clamp(0.0, 1.0));
   }
 
   Future<void> _resetEqualizer() async {
     setState(() {
       _currentEqPreset = 'Normal';
-      _currentEqValues = [0, 0, 0];
+      _currentEqValues = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
       _isEqActive = false;
     });
     await _applyEqualizer();
@@ -235,7 +256,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           builder: (context, setModalState) {
             return Container(
               padding: const EdgeInsets.all(20),
-              height: MediaQuery.of(context).size.height * 0.7,
+              height: MediaQuery.of(context).size.height * 0.8,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -332,15 +353,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   const SizedBox(height: 16),
                   const Divider(color: Colors.white24),
                   
-                  // EQ Sliders - 3 Band
+                  // 10 Band EQ Sliders
                   const Text(
-                    '3 BAND EQUALIZER',
+                    '10 BAND EQUALIZER',
                     style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Expanded(
                     child: ListView.builder(
-                      itemCount: 3,
+                      itemCount: 10,
                       itemBuilder: (context, index) {
                         return _buildEqSlider(
                           label: _bandLabels[index],
@@ -379,7 +400,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                           setState(() {
                             _isEqActive = value;
                             if (!value) {
-                              _currentEqValues = [0, 0, 0];
+                              _currentEqValues = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
                               _currentEqPreset = 'Normal';
                             }
                           });
@@ -406,9 +427,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     required Function(double) onChanged,
   }) {
     List<Color> colors = [
-      Colors.red,
-      Colors.green,
-      Colors.blue,
+      Colors.red, Colors.orange, Colors.amber, Colors.yellow, Colors.lime,
+      Colors.green, Colors.cyan, Colors.blue, Colors.indigo, Colors.purple
     ];
     Color color = colors[index % colors.length];
     
@@ -420,20 +440,20 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             Row(
               children: [
                 Container(
-                  width: 50,
+                  width: 45,
                   alignment: Alignment.centerRight,
                   child: Text(
                     label,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Slider(
                     value: value,
-                    min: -10,
-                    max: 10,
-                    divisions: 20,
+                    min: -15,
+                    max: 15,
+                    divisions: 30,
                     activeColor: color,
                     inactiveColor: Colors.grey.shade800,
                     onChanged: onChanged,
@@ -447,7 +467,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     value > 0 ? '+${value.toInt()}' : '${value.toInt()}',
                     style: TextStyle(
                       color: value == 0 ? Colors.white54 : color,
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -467,13 +487,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      List<String> playlistPaths = _playlist.map((f) => f.path ?? '').toList();
+      List<String> playlistPaths = _playlist.map((f) => f.path).toList();
       await prefs.setStringList('playlist', playlistPaths);
       
-      List<String> favoritePaths = _favorites.map((f) => f.path ?? '').toList();
+      List<String> favoritePaths = _favorites.map((f) => f.path).toList();
       await prefs.setStringList('favorites', favoritePaths);
       
-      List<String> recentPaths = _recent.map((f) => f.path ?? '').toList();
+      List<String> recentPaths = _recent.map((f) => f.path).toList();
       await prefs.setStringList('recent', recentPaths);
       
       await prefs.setInt('currentIndex', _currentIndex);
@@ -487,7 +507,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       
       Map<String, List<String>> playlistMap = {};
       _customPlaylists.forEach((key, value) {
-        playlistMap[key] = value.map((f) => f.path ?? '').toList();
+        playlistMap[key] = value.map((f) => f.path).toList();
       });
       await prefs.setString('customPlaylists', jsonEncode(playlistMap));
       
@@ -504,11 +524,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       if (playlistPaths != null && playlistPaths.isNotEmpty) {
         _playlist = playlistPaths
             .where((path) => File(path).existsSync())
-            .map((path) => PlatformFile(
-                  name: path.split('/').last,
-                  path: path,
-                  size: 0,
-                ))
+            .map((path) => File(path))
             .toList();
       }
       
@@ -516,11 +532,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       if (favoritePaths != null && favoritePaths.isNotEmpty) {
         _favorites = favoritePaths
             .where((path) => File(path).existsSync())
-            .map((path) => PlatformFile(
-                  name: path.split('/').last,
-                  path: path,
-                  size: 0,
-                ))
+            .map((path) => File(path))
             .toList();
       }
       
@@ -528,11 +540,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       if (recentPaths != null && recentPaths.isNotEmpty) {
         _recent = recentPaths
             .where((path) => File(path).existsSync())
-            .map((path) => PlatformFile(
-                  name: path.split('/').last,
-                  path: path,
-                  size: 0,
-                ))
+            .map((path) => File(path))
             .toList();
       }
       
@@ -545,12 +553,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _isEqActive = prefs.getBool('eqActive') ?? false;
       
       List<String>? eqValues = prefs.getStringList('eqValues');
-      if (eqValues != null && eqValues.length == 3) {
+      if (eqValues != null && eqValues.length == 10) {
         _currentEqValues = eqValues.map((v) => double.tryParse(v) ?? 0).toList();
       }
       
       _volume = prefs.getDouble('volume') ?? 1.0;
-      _baseVolume = _volume;
       is3DMode = prefs.getBool('is3DMode') ?? false;
       isShuffle = prefs.getBool('isShuffle') ?? false;
       repeatMode = prefs.getInt('repeatMode') ?? 0;
@@ -562,11 +569,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           List<String> paths = List<String>.from(value);
           _customPlaylists[key] = paths
               .where((path) => File(path).existsSync())
-              .map((path) => PlatformFile(
-                    name: path.split('/').last,
-                    path: path,
-                    size: 0,
-                  ))
+              .map((path) => File(path))
               .toList();
         });
       }
@@ -614,7 +617,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     _saveData();
   }
 
-  void _addSongToPlaylist(String playlistName, PlatformFile song) {
+  void _addSongToPlaylist(String playlistName, File song) {
     setState(() {
       if (_customPlaylists.containsKey(playlistName)) {
         if (!_customPlaylists[playlistName]!.contains(song)) {
@@ -625,7 +628,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     _saveData();
   }
 
-  void _removeFromPlaylist(String playlistName, PlatformFile song) {
+  void _removeFromPlaylist(String playlistName, File song) {
     setState(() {
       if (_customPlaylists.containsKey(playlistName)) {
         _customPlaylists[playlistName]!.remove(song);
@@ -650,8 +653,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               borderSide: BorderSide(color: _accentColor.withOpacity(0.3)),
             ),
             focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: _accentColor),
-            ),
+              borderSide: BorderSide(color: _accentColor)),
           ),
           onChanged: (value) => _newPlaylistName = value,
         ),
@@ -673,7 +675,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   void _showAddToPlaylistDialog(String playlistName) {
-    List<PlatformFile> availableSongs = _playlist.where((song) =>
+    List<File> availableSongs = _playlist.where((song) =>
       !_customPlaylists[playlistName]!.contains(song)
     ).toList();
 
@@ -736,7 +738,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       itemCount: availableSongs.length,
                       itemBuilder: (context, index) {
                         final song = availableSongs[index];
-                        String cleanName = _cleanSongName(song.name);
+                        String cleanName = _cleanSongName(song.path.split('/').last);
                         List<Color> gradient = _getSongGradient(index);
                         return Container(
                           margin: const EdgeInsets.only(bottom: 6),
@@ -924,7 +926,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               final song = _getFilteredSongs()[index];
                               final originalIndex = _playlist.indexOf(song);
                               bool isCurrent = originalIndex == _currentIndex;
-                              String cleanName = _cleanSongName(song.name);
+                              String cleanName = _cleanSongName(song.path.split('/').last);
                               List<Color> gradient = _getSongGradient(originalIndex);
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 6),
@@ -1095,7 +1097,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
       if (result != null && result.files.isNotEmpty) {
         setState(() {
-          _playlist.addAll(result.files);
+          _playlist.addAll(result.files.map((f) => File(f.path!)));
           if (_playlist.length == result.files.length) {
             _currentIndex = 0;
           }
@@ -1135,10 +1137,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _saveData();
       }
 
-      if (currentFile.path != null) {
-        await _audioPlayer.stop();
-        await _audioPlayer.play(DeviceFileSource(currentFile.path!));
-        _baseVolume = _volume;
+      if (currentFile.path.isNotEmpty) {
+        await _audioPlayer.setAudioSource(AudioSource.file(currentFile.path));
         await _audioPlayer.setVolume(_volume);
         await _audioPlayer.setBalance(is3DMode ? 0.5 : 0.0);
         
@@ -1147,6 +1147,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           await _applyEqualizer();
         }
         
+        await _audioPlayer.play();
         if (mounted) {
           setState(() => isPlaying = true);
           _saveData();
@@ -1157,7 +1158,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
-  Future<void> _playSpecificSong(PlatformFile song) async {
+  Future<void> _playSpecificSong(File song) async {
     int index = _playlist.indexOf(song);
     if (index != -1) {
       setState(() => _currentIndex = index);
@@ -1213,7 +1214,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         if (_position == Duration.zero && _duration == Duration.zero) {
           await _playCurrentSongInQueue();
         } else {
-          await _audioPlayer.resume();
+          await _audioPlayer.play();
           if (mounted) setState(() => isPlaying = true);
           _saveData();
         }
@@ -1240,7 +1241,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
   }
 
-  void _toggleFavorite(PlatformFile song) {
+  void _toggleFavorite(File song) {
     setState(() {
       if (_favorites.contains(song)) {
         _favorites.remove(song);
@@ -1395,10 +1396,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // ============================================================
   // UI HELPERS
   // ============================================================
-  List<PlatformFile> _getFilteredSongs() {
+  List<File> _getFilteredSongs() {
     if (_searchQuery.isEmpty) return _playlist;
     return _playlist.where((song) =>
-      _cleanSongName(song.name).toLowerCase().contains(_searchQuery.toLowerCase())
+      _cleanSongName(song.path.split('/').last).toLowerCase().contains(_searchQuery.toLowerCase())
     ).toList();
   }
 
@@ -1453,7 +1454,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       itemCount: _favorites.length,
       itemBuilder: (context, index) {
         final song = _favorites[index];
-        String cleanName = _cleanSongName(song.name);
+        String cleanName = _cleanSongName(song.path.split('/').last);
         List<Color> gradient = _getSongGradient(index);
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
@@ -1517,7 +1518,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       itemCount: _recent.length,
       itemBuilder: (context, index) {
         final song = _recent[index];
-        String cleanName = _cleanSongName(song.name);
+        String cleanName = _cleanSongName(song.path.split('/').last);
         List<Color> gradient = _getSongGradient(index);
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
@@ -1690,13 +1691,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                       ),
                                       child: Center(
                                         child: Text(
-                                          _cleanSongName(song.name).substring(0, 1).toUpperCase(),
+                                          _cleanSongName(song.path.split('/').last).substring(0, 1).toUpperCase(),
                                           style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                                         ),
                                       ),
                                     ),
                                     title: Text(
-                                      _cleanSongName(song.name),
+                                      _cleanSongName(song.path.split('/').last),
                                       style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -1764,7 +1765,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             onChanged: (value) async {
                               setModalState(() => _volume = value);
                               setState(() => _volume = value);
-                              _baseVolume = value;
                               await _audioPlayer.setVolume(value);
                               _saveData();
                             },
@@ -1839,7 +1839,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // PLAYER UI
   // ============================================================
   Widget _buildPlayerUI() {
-    String currentSongName = _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].name) : "No song playing";
+    String currentSongName = _playlist.isNotEmpty ? _cleanSongName(_playlist[_currentIndex].path.split('/').last) : "No song playing";
     String currentArtist = _playlist.isNotEmpty ? "Luna Echo" : "Luna Echo";
     bool isCurrentFavorite = _playlist.isNotEmpty && _favorites.contains(_playlist[_currentIndex]);
     bool hasSongs = _playlist.isNotEmpty;
@@ -1920,7 +1920,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                           child: Center(
                             child: hasSongs
                                 ? Text(
-                                    _cleanSongName(_playlist[_currentIndex].name)
+                                    _cleanSongName(_playlist[_currentIndex].path.split('/').last)
                                         .substring(0, 1)
                                         .toUpperCase(),
                                     style: const TextStyle(
