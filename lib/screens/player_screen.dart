@@ -43,9 +43,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
 
-  // ============================================================
-  // EQUALIZER (Simulated)
-  // ============================================================
+  // Equalizer
   bool _isEqActive = false;
   String _currentEqPreset = 'Normal';
   final List<String> _bandLabels = ['Bass', 'Mid', 'Treble'];
@@ -1037,15 +1035,28 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
-  Future<void> _playSpecificSong(PlatformFile song) async {
-    int index = _playlist.indexOf(song);
-    if (index != -1) {
-      setState(() => _currentIndex = index);
-    } else {
+  // ============================================================
+  // FIX: Playlist Song Sequence Bug
+  // ============================================================
+  Future<void> _playSpecificSong(PlatformFile song, {List<PlatformFile>? playlist}) async {
+    // Agar playlist provide ki gayi hai toh queue REPLACE karein
+    if (playlist != null && playlist.isNotEmpty) {
       setState(() {
-        _playlist.add(song);
-        _currentIndex = _playlist.length - 1;
+        _playlist = List.from(playlist);  // Purani queue replace
+        _currentIndex = _playlist.indexOf(song); // Song ka index
+        if (_currentIndex == -1) _currentIndex = 0;
       });
+    } else {
+      // Normal flow (jaise pehle tha)
+      int index = _playlist.indexOf(song);
+      if (index != -1) {
+        setState(() => _currentIndex = index);
+      } else {
+        setState(() {
+          _playlist.add(song);
+          _currentIndex = _playlist.length - 1;
+        });
+      }
     }
     _saveData();
     await _playCurrentSongInQueue();
@@ -1398,7 +1409,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // PLAYLISTS TAB
+  // PLAYLISTS TAB (UPDATED with Queue Replace)
   // ============================================================
   Widget _buildPlaylistsTab() {
     return Column(
@@ -1533,7 +1544,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                       icon: const Icon(Icons.close, color: Colors.white54, size: 18),
                                       onPressed: () => _removeFromPlaylist(playlistName, song),
                                     ),
-                                    onTap: () => _playSpecificSong(song),
+                                    // ===== FIX: Playlist se song play karne par queue replace =====
+                                    onTap: () => _playSpecificSong(song, playlist: songs),
                                   ),
                                 );
                               }).toList(),
