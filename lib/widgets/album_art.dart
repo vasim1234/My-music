@@ -5,7 +5,8 @@ class AlbumArt extends StatelessWidget {
   final bool isPlaying;
   final bool is3DMode;
   final String songName;
-  final int? songId; // MP3 ki Artwork ID
+  final String? songPath; // PlayerScreen ke parameter compatibility ke liye
+  final int? songId;
   final List<Color> gradient;
   final bool isSleepTimerActive;
   final Animation<double> animation;
@@ -16,6 +17,7 @@ class AlbumArt extends StatelessWidget {
     required this.isPlaying,
     required this.is3DMode,
     required this.songName,
+    this.songPath,
     this.songId,
     required this.gradient,
     required this.isSleepTimerActive,
