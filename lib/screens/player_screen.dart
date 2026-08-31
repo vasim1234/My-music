@@ -1773,32 +1773,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               child: const Icon(Icons.timer, color: Colors.white, size: 12),
                             ),
                           ),
-                        Positioned(
-                          bottom: 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: _accentColor.withOpacity(0.3), width: 1),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(isPlaying ? Icons.play_arrow : Icons.pause, color: _accentColor, size: 11),
-                                const SizedBox(width: 4),
-                                Text(isPlaying ? 'Playing' : 'Paused', style: TextStyle(color: _accentColor, fontSize: 9, fontWeight: FontWeight.w500)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            
+                        
             const SizedBox(height: 20),
             
             // Progress Bar
