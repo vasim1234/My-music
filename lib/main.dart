@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'screens/player_screen.dart';
-import 'screens/splash_screen.dart';
 
 void main() {
   runApp(const MyMusicApp());
@@ -18,7 +17,7 @@ class MyMusicApp extends StatelessWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF121212),
       ),
-      home: const SplashScreen(),
+      home: const PlayerScreen(),
     );
   }
 }
