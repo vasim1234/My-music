@@ -1,12 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:on_audio_query/on_audio_query.dart';
 
 class AlbumArt extends StatelessWidget {
   final bool isPlaying;
   final bool is3DMode;
   final String songName;
-  final String? songPath; // PlayerScreen ke parameter compatibility ke liye
-  final int? songId;
+  final String? songPath;
   final List<Color> gradient;
   final bool isSleepTimerActive;
   final Animation<double> animation;
@@ -18,7 +17,6 @@ class AlbumArt extends StatelessWidget {
     required this.is3DMode,
     required this.songName,
     this.songPath,
-    this.songId,
     required this.gradient,
     required this.isSleepTimerActive,
     required this.animation,
@@ -36,7 +34,7 @@ class AlbumArt extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Outer Glow Circle
+                // Outer Glow
                 Container(
                   height: 220,
                   width: 220,
@@ -58,19 +56,10 @@ class AlbumArt extends StatelessWidget {
                   width: 200,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.grey.shade900,
+                    color: const Color(0xFF1E1E2C),
+                    image: _getAlbumArtImage(),
                   ),
-                  child: ClipOval(
-                    child: songId != null
-                        ? QueryArtworkWidget(
-                            id: songId!,
-                            type: ArtworkType.AUDIO,
-                            artworkFit: BoxFit.cover,
-                            nullArtworkWidget: _buildDefaultFallback(),
-                            errorBuilder: (context, error, stackTrace) => _buildDefaultFallback(),
-                          )
-                        : _buildDefaultFallback(),
-                  ),
+                  child: _getAlbumArtFallback(),
                 ),
                 // Sleep Timer Badge
                 if (isSleepTimerActive)
@@ -94,31 +83,59 @@ class AlbumArt extends StatelessWidget {
     );
   }
 
-  // Photo na hone par app logo/icon dikhane ke liye
-  Widget _buildDefaultFallback() {
-    return Container(
-      color: const Color(0xFF1E1E2C),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.music_note_rounded,
-              size: 70,
-              color: accentColor,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              songName.isNotEmpty ? songName.substring(0, 1).toUpperCase() : "M",
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.white70,
-              ),
-            ),
-          ],
+  // ============================================================
+  // ALBUM ART HELPERS
+  // ============================================================
+
+  // Try to get album art from song file
+  DecorationImage? _getAlbumArtImage() {
+    if (songPath == null || songPath!.isEmpty) return null;
+    
+    try {
+      final file = File(songPath!);
+      if (file.existsSync()) {
+        // Check if file has embedded image
+        return DecorationImage(
+          image: FileImage(file),
+          fit: BoxFit.cover,
+        );
+      }
+    } catch (e) {
+      // Image load nahi hui toh null return karo
+    }
+    return null;
+  }
+
+  // Fallback: Agar image nahi hai toh letter ya icon dikhao
+  Widget _getAlbumArtFallback() {
+    // Agar songPath nahi hai toh music note dikhao
+    if (songPath == null || songPath!.isEmpty || songName == "No song playing") {
+      return Center(
+        child: Icon(
+          Icons.music_note_rounded,
+          size: 60,
+          color: Colors.white.withOpacity(0.5),
         ),
-      ),
-    );
+      );
+    }
+    
+    // Try to check if image exists
+    final hasImage = _getAlbumArtImage() != null;
+    
+    if (!hasImage) {
+      // Agar image nahi hai toh song ka first letter dikhao
+      return Center(
+        child: Text(
+          songName.isNotEmpty ? songName.substring(0, 1).toUpperCase() : "M",
+          style: const TextStyle(
+            fontSize: 56,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      );
+    }
+    
+    return const SizedBox.shrink(); // Image show hogi via BoxDecoration
   }
 }
