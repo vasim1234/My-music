@@ -29,8 +29,8 @@ class MyAudioHandler extends BaseAudioHandler {
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
   }
 
-  // Update song details (Title, Artist, Duration) dynamically
-  void updateMediaItem(String title, String artist, Duration duration) {
+  // ✅ Changed name from updateMediaItem to updateSongInfo to avoid override conflict
+  void updateSongInfo(String title, String artist, Duration duration) {
     mediaItem.add(
       MediaItem(
         id: 'current_song_id',
@@ -86,7 +86,7 @@ class MyAudioHandler extends BaseAudioHandler {
       updatePosition: _player.position,
       bufferedPosition: _player.bufferedPosition,
       speed: _player.speed,
-      queueIndex: event.currentIndex ?? 0,  // ← FIXED
+      queueIndex: event.currentIndex ?? 0,
     );
   }
 
