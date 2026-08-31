@@ -6,7 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/album_art.dart';
-import '../services/background_handler.dart';
+import '../services/audio_handler.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -119,51 +119,57 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return name;
   }
 
-  @override
-  void initState() {
-    super.initState();
-    
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-    
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
+ @override
+void initState() {
+  super.initState();
+  
+  _pulseController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat(reverse: true);
+  
+  _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+    CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+  );
 
-    _loadSavedData();
-    _initBackgroundService();
+  _loadSavedData();
 
-    _audioPlayer.onDurationChanged.listen((newDuration) {
-      if (mounted) setState(() => _duration = newDuration);
-    });
-    
-    _audioPlayer.onPositionChanged.listen((newPosition) {
-      if (mounted) setState(() => _position = newPosition);
-    });
-    
-    _audioPlayer.onPlayerComplete.listen((_) {
-      _handleSongCompletion();
-    });
-  }
+  // ===== INITIALIZE AUDIO SERVICE =====
+  _initAudioService();
 
-  @override
-  void dispose() {
-    _saveData();
-    _pulseController.dispose();
-    _audioPlayer.dispose();
-    _sleepTimer?.cancel();
-    super.dispose();
+  _audioPlayer.onDurationChanged.listen((newDuration) {
+    if (mounted) setState(() => _duration = newDuration);
+  });
+  
+  _audioPlayer.onPositionChanged.listen((newPosition) {
+    if (mounted) setState(() => _position = newPosition);
+  });
+  
+  _audioPlayer.onPlayerComplete.listen((_) {
+    _handleSongCompletion();
+  });
+}
+
+@override
+void dispose() {
+  _saveData();
+  _pulseController.dispose();
+  _audioPlayer.dispose();
+  _sleepTimer?.cancel();
+  super.dispose();
+}
+
+// ============================================================
+// AUDIO SERVICE INITIALIZATION
+// ============================================================
+Future<void> _initAudioService() async {
+  try {
+    audioHandler = await initAudioService();
+    debugPrint('✅ Audio service initialized successfully');
+  } catch (e) {
+    debugPrint('❌ Audio service error: $e');
   }
-  Future<void> _initBackgroundService() async {
-    try {
-      await BackgroundHandler().initialize();
-      print('✅ Background service initialized');
-    } catch (e) {
-      print('❌ Background service error: $e');
-    }
-  }
+} 
 
   // ============================================================
   // EQUALIZER FUNCTIONS
