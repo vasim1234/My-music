@@ -1570,7 +1570,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               icon: const Icon(Icons.close, color: Colors.white54, size: 18),
                               onPressed: () => _removeFromPlaylist(playlistName, song),
                             ),
-                            onPressed: () => _showAddToPlaylistDialog(playlistName),
+                            onTap: () => _playSpecificSong(song, playlist: songs),
                           ),
                         );
                       }).toList(),
