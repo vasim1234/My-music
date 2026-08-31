@@ -50,16 +50,16 @@ class AlbumArt extends StatelessWidget {
                     ],
                   ),
                 ),
-                // ===== MAIN ALBUM ART CIRCLE =====
+                // Main Album Art Circle
                 Container(
                   height: 180,
                   width: 180,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.grey.shade900,
-                    image: _getAlbumArtImage(),  // ← Real image
+                    image: _getAlbumArtImage(),
                   ),
-                  child: _getAlbumArtFallback(), // ← Fallback
+                  child: _getAlbumArtFallback(),
                 ),
                 // Sleep Timer Badge
                 if (isSleepTimerActive)
@@ -75,7 +75,6 @@ class AlbumArt extends StatelessWidget {
                       child: const Icon(Icons.timer, color: Colors.white, size: 12),
                     ),
                   ),
-                // ===== BADGE HATAYA =====
               ],
             ),
           );
@@ -106,7 +105,7 @@ class AlbumArt extends StatelessWidget {
     return null;
   }
 
-  // Fallback: Agar image nahi hai toh letter ya icon dikhao
+  // ===== FIX: return null → return const SizedBox.shrink() =====
   Widget _getAlbumArtFallback() {
     // Agar songPath nahi hai toh music note dikhao
     if (songPath == null || songPath!.isEmpty || songName == "No song playing") {
@@ -136,6 +135,7 @@ class AlbumArt extends StatelessWidget {
       );
     }
     
-    return null; // Image show hogi via BoxDecoration
+    // ===== FIX: null → SizedBox.shrink() =====
+    return const SizedBox.shrink(); // Image show hogi via BoxDecoration
   }
 }
