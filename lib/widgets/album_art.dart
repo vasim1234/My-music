@@ -1,21 +1,26 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 class AlbumArt extends StatelessWidget {
   final bool isPlaying;
   final bool is3DMode;
   final String songName;
+  final String? songPath;
   final List<Color> gradient;
   final bool isSleepTimerActive;
   final Animation<double> animation;
+  final Color accentColor;
 
   const AlbumArt({
     super.key,
     required this.isPlaying,
     required this.is3DMode,
     required this.songName,
+    this.songPath,
     required this.gradient,
     required this.isSleepTimerActive,
     required this.animation,
+    required this.accentColor,
   });
 
   @override
@@ -29,6 +34,7 @@ class AlbumArt extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
+                // Outer Glow
                 Container(
                   height: 200,
                   width: 200,
@@ -37,41 +43,25 @@ class AlbumArt extends StatelessWidget {
                     gradient: LinearGradient(colors: gradient),
                     boxShadow: [
                       BoxShadow(
-                        color: gradient[0].withOpacity(0.3),
+                        color: accentColor.withOpacity(0.3),
                         blurRadius: 35,
                         spreadRadius: 6,
                       ),
                     ],
                   ),
                 ),
+                // ===== MAIN ALBUM ART CIRCLE =====
                 Container(
                   height: 180,
                   width: 180,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: Colors.grey.shade900,
+                    image: _getAlbumArtImage(),  // ← Real image
                   ),
-                  child: Center(
-                    child: songName.isNotEmpty
-                        ? Text(
-                            songName.substring(0, 1).toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 56,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.music_note_rounded,
-                            size: 60,
-                            color: Colors.white,
-                          ),
-                  ),
+                  child: _getAlbumArtFallback(), // ← Fallback
                 ),
+                // Sleep Timer Badge
                 if (isSleepTimerActive)
                   Positioned(
                     top: 0,
@@ -85,41 +75,67 @@ class AlbumArt extends StatelessWidget {
                       child: const Icon(Icons.timer, color: Colors.white, size: 12),
                     ),
                   ),
-                Positioned(
-                  bottom: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: gradient[0].withOpacity(0.3), width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isPlaying ? Icons.play_arrow : Icons.pause,
-                          color: gradient[0],
-                          size: 11,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          isPlaying ? 'Playing' : 'Paused',
-                          style: TextStyle(
-                            color: gradient[0],
-                            fontSize: 9,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                // ===== BADGE HATAYA =====
               ],
             ),
           );
         },
       ),
     );
+  }
+
+  // ============================================================
+  // ALBUM ART HELPERS
+  // ============================================================
+
+  // Try to get album art from song file
+  DecorationImage? _getAlbumArtImage() {
+    if (songPath == null || songPath!.isEmpty) return null;
+    
+    try {
+      final file = File(songPath!);
+      if (file.existsSync()) {
+        return DecorationImage(
+          image: FileImage(file),
+          fit: BoxFit.cover,
+        );
+      }
+    } catch (e) {
+      // Image load nahi hui toh null return karo
+    }
+    return null;
+  }
+
+  // Fallback: Agar image nahi hai toh letter ya icon dikhao
+  Widget _getAlbumArtFallback() {
+    // Agar songPath nahi hai toh music note dikhao
+    if (songPath == null || songPath!.isEmpty || songName == "No song playing") {
+      return Center(
+        child: Icon(
+          Icons.music_note_rounded,
+          size: 60,
+          color: Colors.white.withOpacity(0.5),
+        ),
+      );
+    }
+    
+    // Try to check if image exists
+    final hasImage = _getAlbumArtImage() != null;
+    
+    if (!hasImage) {
+      // Agar image nahi hai toh song ka first letter dikhao
+      return Center(
+        child: Text(
+          songName.isNotEmpty ? songName.substring(0, 1).toUpperCase() : "M",
+          style: const TextStyle(
+            fontSize: 56,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      );
+    }
+    
+    return null; // Image show hogi via BoxDecoration
   }
 }
