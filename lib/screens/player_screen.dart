@@ -164,7 +164,7 @@ void dispose() {
 // ============================================================
 Future<void> _initAudioService() async {
   try {
-    await BackgroundHandler().initialize();
+    await initAudioService();
     debugPrint('✅ Audio service initialized successfully');
   } catch (e) {
     debugPrint('❌ Audio service error: $e');
