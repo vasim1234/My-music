@@ -30,29 +30,24 @@ class AlbumArt extends StatelessWidget {
       child: AnimatedBuilder(
         animation: animation,
         builder: (context, child) {
-          // ============================================================
-          // BASS BEAT PULSE LOGIC (Equalizer/Music Beat Effect)
-          // ============================================================
-          // Normal linear scaling ko Curve se replace karke Beat Effect banaya
-          double animValue = animation.value; // 通常 1.0 -> 1.08 -> 1.0
-          
-          // Music Beat Curve Simulation (Double-Beat pulse like heart / bass)
+          double animValue = animation.value;
           double pulseScale = 1.0;
           double beatGlow = 0.0;
           
           if (isPlaying) {
-            // Sine wave calculation for sharp bass pulse
             double rawFactor = math.sin((animValue - 1.0) * math.pi * 10);
-            pulseScale = 1.0 + (rawFactor.abs() * 0.06); // Beats up to 6% larger
-            beatGlow = rawFactor.abs(); // Glow intense on beat drop
+            pulseScale = 1.0 + (rawFactor.abs() * 0.06);
+            beatGlow = rawFactor.abs();
           }
+
+          final hasImage = _hasValidImage();
 
           return Transform.scale(
             scale: pulseScale,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // 1. Outer Bass Pulse Aura (Beats hard with music)
+                // 1. Outer Bass Pulse Aura
                 Container(
                   height: 245,
                   width: 245,
@@ -70,7 +65,7 @@ class AlbumArt extends StatelessWidget {
                   ),
                 ),
 
-                // 2. Inner Glowing Border (Gradients with Beat Intensity)
+                // 2. Inner Glowing Border
                 Container(
                   height: 215,
                   width: 215,
@@ -92,7 +87,7 @@ class AlbumArt extends StatelessWidget {
                   ),
                 ),
 
-                // 3. Main Album Art Circle
+                // 3. Main Album Art Circle (Image or Fallback)
                 Container(
                   height: 200,
                   width: 200,
@@ -103,9 +98,14 @@ class AlbumArt extends StatelessWidget {
                       color: Colors.white.withOpacity(isPlaying ? 0.25 : 0.1),
                       width: 2,
                     ),
-                    image: _getAlbumArtImage(),
+                    image: hasImage
+                        ? DecorationImage(
+                            image: FileImage(File(songPath!)),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
-                  child: _getAlbumArtFallback(),
+                  child: !hasImage ? _buildDefaultFallback() : null,
                 ),
 
                 // 4. Sleep Timer Badge
@@ -136,57 +136,46 @@ class AlbumArt extends StatelessWidget {
     );
   }
 
-  // ============================================================
-  // ALBUM ART HELPERS
-  // ============================================================
-
-  DecorationImage? _getAlbumArtImage() {
-    if (songPath == null || songPath!.isEmpty) return null;
-    
+  bool _hasValidImage() {
+    if (songPath == null || songPath!.isEmpty) return false;
     try {
       final file = File(songPath!);
-      if (file.existsSync()) {
-        return DecorationImage(
-          image: FileImage(file),
-          fit: BoxFit.cover,
-        );
+      // Checking if file ends with image extensions, otherwise audio file path directly won't render as image
+      final pathLower = songPath!.toLowerCase();
+      if (file.existsSync() && (pathLower.endsWith('.jpg') || pathLower.endsWith('.png') || pathLower.endsWith('.jpeg'))) {
+        return true;
       }
     } catch (_) {}
-    return null;
+    return false;
   }
 
-  Widget _getAlbumArtFallback() {
-    if (songPath == null || songPath!.isEmpty || songName == "No song playing") {
-      return Center(
-        child: Icon(
-          Icons.music_note_rounded,
-          size: 60,
-          color: accentColor.withOpacity(0.8),
-        ),
-      );
-    }
-    
-    final hasImage = _getAlbumArtImage() != null;
-    
-    if (!hasImage) {
-      return Center(
-        child: Text(
-          songName.isNotEmpty ? songName.substring(0, 1).toUpperCase() : "M",
-          style: TextStyle(
-            fontSize: 56,
-            fontWeight: FontWeight.bold,
+  Widget _buildDefaultFallback() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.music_note_rounded,
+            size: 65,
             color: accentColor,
-            shadows: [
-              Shadow(
-                color: accentColor.withOpacity(0.6),
-                blurRadius: 15,
-              ),
-            ],
           ),
-        ),
-      );
-    }
-    
-    return const SizedBox.shrink();
+          const SizedBox(height: 6),
+          Text(
+            songName.isNotEmpty ? songName.substring(0, 1).toUpperCase() : "M",
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white.withOpacity(0.9),
+              shadows: [
+                Shadow(
+                  color: accentColor.withOpacity(0.6),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
