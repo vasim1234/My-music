@@ -133,6 +133,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
 
     _loadSavedData();
+    _initBackgroundService();
 
     _audioPlayer.onDurationChanged.listen((newDuration) {
       if (mounted) setState(() => _duration = newDuration);
@@ -154,6 +155,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     _audioPlayer.dispose();
     _sleepTimer?.cancel();
     super.dispose();
+  }
+  Future<void> _initBackgroundService() async {
+    try {
+      await BackgroundHandler().initialize();
+      print('✅ Background service initialized');
+    } catch (e) {
+      print('❌ Background service error: $e');
+    }
   }
 
   // ============================================================
