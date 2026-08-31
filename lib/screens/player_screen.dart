@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/album_art.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
