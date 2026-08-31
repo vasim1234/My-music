@@ -24,16 +24,22 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/icon/icon.png
+    - assets/icon/
 
-# App Icon Configuration (Jo app ka logo hat gaya tha)
+# ============================================================
+# APP ICON CONFIGURATION
+# ============================================================
 flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
+  android: true
+  ios: false
   image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#0A0A0F"
+  adaptive_icon_foreground: "assets/icon/icon.png"
   min_sdk_android: 21
 
-# Splash Screen Configuration
+# ============================================================
+# SPLASH SCREEN CONFIGURATION
+# ============================================================
 flutter_native_splash:
   color: "#0A0A0F"
   image: assets/icon/icon.png
