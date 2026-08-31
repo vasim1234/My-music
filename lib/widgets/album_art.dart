@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 class AlbumArt extends StatelessWidget {
@@ -29,50 +30,102 @@ class AlbumArt extends StatelessWidget {
       child: AnimatedBuilder(
         animation: animation,
         builder: (context, child) {
+          // ============================================================
+          // BASS BEAT PULSE LOGIC (Equalizer/Music Beat Effect)
+          // ============================================================
+          // Normal linear scaling ko Curve se replace karke Beat Effect banaya
+          double animValue = animation.value; // 通常 1.0 -> 1.08 -> 1.0
+          
+          // Music Beat Curve Simulation (Double-Beat pulse like heart / bass)
+          double pulseScale = 1.0;
+          double beatGlow = 0.0;
+          
+          if (isPlaying) {
+            // Sine wave calculation for sharp bass pulse
+            double rawFactor = math.sin((animValue - 1.0) * math.pi * 10);
+            pulseScale = 1.0 + (rawFactor.abs() * 0.06); // Beats up to 6% larger
+            beatGlow = rawFactor.abs(); // Glow intense on beat drop
+          }
+
           return Transform.scale(
-            scale: isPlaying ? animation.value : 1.0,
+            scale: pulseScale,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Outer Glow
+                // 1. Outer Bass Pulse Aura (Beats hard with music)
                 Container(
-                  height: 220,
-                  width: 220,
+                  height: 245,
+                  width: 245,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: gradient),
                     boxShadow: [
                       BoxShadow(
-                        color: accentColor.withOpacity(0.35),
-                        blurRadius: 30,
-                        spreadRadius: 5,
+                        color: accentColor.withOpacity(
+                          isPlaying ? 0.25 + (beatGlow * 0.25) : 0.08,
+                        ),
+                        blurRadius: isPlaying ? 35 + (beatGlow * 25) : 15,
+                        spreadRadius: isPlaying ? 5 + (beatGlow * 12) : 2,
                       ),
                     ],
                   ),
                 ),
-                // Main Album Art Circle
+
+                // 2. Inner Glowing Border (Gradients with Beat Intensity)
+                Container(
+                  height: 215,
+                  width: 215,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (gradient.isNotEmpty ? gradient.first : accentColor)
+                            .withOpacity(isPlaying ? 0.4 + (beatGlow * 0.3) : 0.2),
+                        blurRadius: isPlaying ? 18 + (beatGlow * 10) : 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 3. Main Album Art Circle
                 Container(
                   height: 200,
                   width: 200,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFF1E1E2C),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(isPlaying ? 0.25 : 0.1),
+                      width: 2,
+                    ),
                     image: _getAlbumArtImage(),
                   ),
                   child: _getAlbumArtFallback(),
                 ),
-                // Sleep Timer Badge
+
+                // 4. Sleep Timer Badge
                 if (isSleepTimerActive)
                   Positioned(
-                    top: 5,
-                    right: 5,
+                    top: 8,
+                    right: 8,
                     child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFF9F43),
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF9F43),
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 6,
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.timer, color: Colors.white, size: 14),
+                      child: const Icon(Icons.timer_rounded, color: Colors.white, size: 14),
                     ),
                   ),
               ],
@@ -87,55 +140,53 @@ class AlbumArt extends StatelessWidget {
   // ALBUM ART HELPERS
   // ============================================================
 
-  // Try to get album art from song file
   DecorationImage? _getAlbumArtImage() {
     if (songPath == null || songPath!.isEmpty) return null;
     
     try {
       final file = File(songPath!);
       if (file.existsSync()) {
-        // Check if file has embedded image
         return DecorationImage(
           image: FileImage(file),
           fit: BoxFit.cover,
         );
       }
-    } catch (e) {
-      // Image load nahi hui toh null return karo
-    }
+    } catch (_) {}
     return null;
   }
 
-  // Fallback: Agar image nahi hai toh letter ya icon dikhao
   Widget _getAlbumArtFallback() {
-    // Agar songPath nahi hai toh music note dikhao
     if (songPath == null || songPath!.isEmpty || songName == "No song playing") {
       return Center(
         child: Icon(
           Icons.music_note_rounded,
           size: 60,
-          color: Colors.white.withOpacity(0.5),
+          color: accentColor.withOpacity(0.8),
         ),
       );
     }
     
-    // Try to check if image exists
     final hasImage = _getAlbumArtImage() != null;
     
     if (!hasImage) {
-      // Agar image nahi hai toh song ka first letter dikhao
       return Center(
         child: Text(
           songName.isNotEmpty ? songName.substring(0, 1).toUpperCase() : "M",
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 56,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: accentColor,
+            shadows: [
+              Shadow(
+                color: accentColor.withOpacity(0.6),
+                blurRadius: 15,
+              ),
+            ],
           ),
         ),
       );
     }
     
-    return const SizedBox.shrink(); // Image show hogi via BoxDecoration
+    return const SizedBox.shrink();
   }
 }
