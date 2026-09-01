@@ -130,6 +130,16 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
     _loadSavedData();
     _initAudioService();
+    
+    // ===== ADD DELAY FOR AUDIO SERVICE =====
+    Future.delayed(const Duration(milliseconds: 800), () {
+      print('🔊 Audio service ready check');
+      if (audioHandler is MyAudioHandler) {
+        print('✅ Audio handler is ready');
+      } else {
+        print('⚠️ Audio handler not ready yet');
+      }
+    });
   }
 
   @override
@@ -142,8 +152,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   Future<void> _initAudioService() async {
     try {
+      print('🔊 Initializing audio service...');
       audioHandler = await initAudioService();
       print('✅ Audio service initialized successfully');
+      print('🔍 audioHandler type: ${audioHandler.runtimeType}');
     } catch (e) {
       print('❌ Audio service error: $e');
     }
@@ -845,7 +857,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // AUDIO PLAYBACK
+  // AUDIO PLAYBACK - FIXED
   // ============================================================
   Future<void> _pickSongs() async {
     try {
@@ -886,11 +898,16 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   Future<void> _playCurrentSongInQueue() async {
-    if (_playlist.isEmpty) return;
+    if (_playlist.isEmpty) {
+      print('⚠️ Playlist is empty');
+      return;
+    }
     
     try {
       final currentFile = _playlist[_currentIndex];
       String cleanName = _cleanSongName(currentFile.name);
+      print('🎵 Playing: $cleanName');
+      print('📁 Path: ${currentFile.path}');
       
       if (!_recent.contains(currentFile)) {
         _recent.insert(0, currentFile);
@@ -898,7 +915,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _saveData();
       }
 
-      if (currentFile.path != null && audioHandler is MyAudioHandler) {
+      // ===== CHECK IF audioHandler IS INITIALIZED =====
+      if (audioHandler == null) {
+        print('⚠️ audioHandler is null, initializing...');
+        await _initAudioService();
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      if (audioHandler is MyAudioHandler) {
+        print('✅ audioHandler is MyAudioHandler');
         await (audioHandler as MyAudioHandler).playSong(
           currentFile.path!,
           cleanName,
@@ -908,15 +933,35 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         if (mounted) {
           setState(() => isPlaying = true);
           _saveData();
+          print('✅ Song playing: $cleanName');
+        }
+      } else {
+        print('❌ audioHandler is NOT MyAudioHandler');
+        print('🔍 audioHandler type: ${audioHandler.runtimeType}');
+        // Try to reinitialize
+        await _initAudioService();
+        await Future.delayed(const Duration(milliseconds: 500));
+        // Retry
+        if (audioHandler is MyAudioHandler) {
+          await (audioHandler as MyAudioHandler).playSong(
+            currentFile.path!,
+            cleanName,
+            'Luna Echo',
+          );
+          if (mounted) {
+            setState(() => isPlaying = true);
+            _saveData();
+          }
         }
       }
     } catch (e) {
-      print('Error playing song: $e');
+      print('❌ Error playing song: $e');
     }
   }
 
   Future<void> _playSpecificSong(PlatformFile song, {List<PlatformFile>? playlist}) async {
     print('🎵 Playing song: ${song.name}');
+    print('📁 Path: ${song.path}');
     
     if (playlist != null && playlist.isNotEmpty) {
       print('📋 Playlist size: ${playlist.length}');
@@ -975,6 +1020,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
     
     try {
+      if (audioHandler == null) {
+        await _initAudioService();
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      
       if (isPlaying) {
         await audioHandler.pause();
         if (mounted) setState(() => isPlaying = false);
@@ -985,7 +1035,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _saveData();
       }
     } catch (e) {
-      print('Error toggling play/pause: $e');
+      print('❌ Error toggling play/pause: $e');
     }
   }
 
