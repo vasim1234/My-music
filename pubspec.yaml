@@ -9,16 +9,21 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  audioplayers: ^5.2.1
-  file_picker: ^6.1.1
-  cupertino_icons: ^1.0.6
-  shared_preferences: ^2.2.2
-  flutter_native_splash: ^2.3.8
-  on_audio_query: ^2.9.0
-  permission_handler: ^11.0.1
+  
+  # Audio & File
+  audioplayers: ^5.0.0
+  file_picker: ^5.5.0
+  permission_handler: ^10.4.3
+  
+  # Background Audio
   audio_service: ^0.18.10
   just_audio: ^0.9.36
   audio_session: ^0.1.17
+  
+  # UI & Utils
+  cupertino_icons: ^1.0.6
+  shared_preferences: ^2.2.2
+  flutter_native_splash: ^2.3.8
 
 dev_dependencies:
   flutter_test:
@@ -47,7 +52,7 @@ flutter_native_splash:
   android_gravity: center
   color_dark: "#0A0A0F"
   image_dark: assets/icon/icon.png
-
+  
   android_12:
     color: "#0A0A0F"
     image: assets/icon/icon.png
