@@ -30,12 +30,11 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // 🔥 POSITION STREAM
+    // 🔥 POSITION STREAM - FIX: Remove 'position' named parameter
     _player.positionStream.listen((position) {
       final currentPlaybackState = playbackState.value;
       playbackState.add(
         currentPlaybackState.copyWith(
-          position: position,
           processingState: _getAudioProcessingState(_player.processingState),
           playing: _player.playing,
           bufferedPosition: _player.bufferedPosition,
@@ -114,7 +113,6 @@ class MyAudioHandler extends BaseAudioHandler {
       final duration = _player.duration;
       print('⏱️ Duration: $duration');
 
-      // 🔥 FIX: Use correct MediaItem constructor
       final item = MediaItem(
         id: path,
         title: title,
@@ -128,12 +126,11 @@ class MyAudioHandler extends BaseAudioHandler {
       await _player.play();
       print('✅ Play command sent');
 
-      // 🔥 FIX: Update playback state with correct types
+      // 🔥 FIX: Remove 'position' named parameter
       playbackState.add(
         playbackState.value.copyWith(
           playing: true,
           processingState: AudioProcessingState.ready,
-          position: Duration.zero,
           bufferedPosition: Duration.zero,
           speed: 1.0,
         ),
@@ -169,6 +166,7 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
+  // 🔥 FIX: Only one stop method
   @override
   Future<void> stop() async {
     try {
@@ -230,7 +228,6 @@ class MyAudioHandler extends BaseAudioHandler {
     await _player.seek(position - const Duration(seconds: 10));
   }
 
-  // 🔥 FIX: Use correct types for audio_service
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
     // Handle repeat mode
@@ -276,13 +273,11 @@ class MyAudioHandler extends BaseAudioHandler {
     // Handle queue
   }
 
-  // 🔥 FIX: Correct click method signature
   @override
   Future<void> click([MediaButton button = MediaButton.media]) async {
     // Handle click
   }
 
-  // 🔥 FIX: Correct setRating method signature
   @override
   Future<void> setRating(Rating rating, [Map<String, dynamic>? extras]) async {
     // Handle rating
@@ -298,13 +293,7 @@ class MyAudioHandler extends BaseAudioHandler {
     // Handle task removed
   }
 
-  // 🔥 Dispose correctly
-  @override
-  Future<void> stop() async {
-    await _player.stop();
-    await super.stop();
-  }
-
+  // 🔥 Dispose method
   Future<void> dispose() async {
     await _player.dispose();
   }
