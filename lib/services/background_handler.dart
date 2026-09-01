@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:rxdart/rxdart.dart';
 
 AudioHandler? audioHandler;
 
@@ -28,10 +27,9 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // Position
+    // Position - 🔥 FIX: position parameter hataya
     _player.positionStream.listen((position) {
       playbackState.add(playbackState.value.copyWith(
-        position: position,
         playing: _player.playing,
       ));
     });
