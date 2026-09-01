@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 
-// Global AudioHandler instance jo poori app mein use hoga
+// Global instance
 late final AudioHandler audioHandler;
 
 Future<AudioHandler> initAudioService() async {
@@ -18,33 +18,39 @@ Future<AudioHandler> initAudioService() async {
   );
 }
 
-// ============================================================
-// MY AUDIO HANDLER
-// ============================================================
 class MyAudioHandler extends BaseAudioHandler {
   final AudioPlayer _player = AudioPlayer();
+  String? _currentSongPath;
 
   MyAudioHandler() {
-    // Listen to player state changes and update audio_service state
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
   }
 
-  // ✅ Changed name from updateMediaItem to updateSongInfo to avoid override conflict
-  void updateSongInfo(String title, String artist, Duration duration) {
-    mediaItem.add(
-      MediaItem(
-        id: 'current_song_id',
-        album: 'My Music 3D',
-        title: title,
-        artist: artist,
-        duration: duration,
-      ),
-    );
-  }
-
-  // Set audio source and play
-  Future<void> setAudioSource(String url) async {
-    await _player.setAudioSource(AudioSource.file(url));
+  // ===== PLAY SONG =====
+  Future<void> playSong(String path, String title, String artist) async {
+    try {
+      // Stop current song if playing
+      await _player.stop();
+      
+      // Set new audio source
+      await _player.setAudioSource(AudioSource.file(path));
+      _currentSongPath = path;
+      
+      // Update notification
+      mediaItem.add(
+        MediaItem(
+          id: path,
+          album: 'My Music 3D',
+          title: title,
+          artist: artist,
+        ),
+      );
+      
+      // Play
+      await _player.play();
+    } catch (e) {
+      print('Play song error: $e');
+    }
   }
 
   @override
@@ -58,14 +64,14 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 
   @override
-  Future<void> seek(Duration position) async {
-    await _player.seek(position);
-  }
-
-  @override
   Future<void> stop() async {
     await _player.stop();
     await super.stop();
+  }
+
+  @override
+  Future<void> seek(Duration position) async {
+    await _player.seek(position);
   }
 
   PlaybackState _transformEvent(PlaybackEvent event) {
@@ -86,7 +92,7 @@ class MyAudioHandler extends BaseAudioHandler {
       updatePosition: _player.position,
       bufferedPosition: _player.bufferedPosition,
       speed: _player.speed,
-      queueIndex: event.currentIndex ?? 0,
+      queueIndex: 0,
     );
   }
 
