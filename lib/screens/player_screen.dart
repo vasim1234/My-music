@@ -856,7 +856,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // AUDIO PLAYBACK - FIXED
+  // AUDIO PLAYBACK
   // ============================================================
   Future<void> _pickSongs() async {
     try {
@@ -914,14 +914,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _saveData();
       }
 
-      // ===== CHECK IF audioHandler IS INITIALIZED =====
       if (audioHandler == null) {
         print('⚠️ audioHandler is null, initializing...');
         await _initAudioService();
         await Future.delayed(const Duration(milliseconds: 500));
       }
 
-      // ===== CHECK IF FILE EXISTS =====
       if (currentFile.path != null) {
         final file = File(currentFile.path!);
         if (!file.existsSync()) {
@@ -953,10 +951,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       } else {
         print('❌ audioHandler is NOT MyAudioHandler');
         print('🔍 audioHandler type: ${audioHandler.runtimeType}');
-        // Try to reinitialize
         await _initAudioService();
         await Future.delayed(const Duration(milliseconds: 500));
-        // Retry
         if (audioHandler is MyAudioHandler) {
           await (audioHandler as MyAudioHandler).playSong(
             currentFile.path!,
@@ -1004,8 +1000,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       }
     }
     _saveData();
-    
-    // ===== PLAY THE SONG =====
     await _playCurrentSongInQueue();
     print('✅ _playSpecificSong completed');
   }
@@ -1049,17 +1043,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         await Future.delayed(const Duration(milliseconds: 500));
       }
       
-      if (audioHandler == null) {
-        print('❌ audioHandler is still null');
-        return;
-      }
-      
       if (isPlaying) {
-        await audioHandler.pause();
+        await audioHandler?.pause();
         if (mounted) setState(() => isPlaying = false);
         _saveData();
       } else {
-        await audioHandler.play();
+        await audioHandler?.play();
         if (mounted) setState(() => isPlaying = true);
         _saveData();
       }
@@ -1073,7 +1062,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     final clampedPosition = newPosition > _duration 
         ? _duration 
         : (newPosition < Duration.zero ? Duration.zero : newPosition);
-    await audioHandler!.seek(clampedPosition);
+    await audioHandler?.seek(clampedPosition);
   }
 
   String _formatDuration(Duration duration) {
@@ -1821,7 +1810,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     value: _position.inSeconds.toDouble().clamp(0.0, _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0),
                     onChanged: (value) async {
                       final position = Duration(seconds: value.toInt());
-                      await audioHandler!.seek(position);
+                      await audioHandler?.seek(position);
                       setState(() => _position = position);
                     },
                   ),
