@@ -168,43 +168,46 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // LISTEN TO AUDIO STREAMS
   // ============================================================
   void _listenToAudioStreams() {
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (audioHandler is MyAudioHandler) {
-        final handler = audioHandler as MyAudioHandler;
-        
-        handler.durationStream.listen((duration) {
-          if (mounted && duration != null) {
-            setState(() {
-              _duration = duration;
-            });
-          }
-        });
-        
-        handler.positionStream.listen((position) {
-          if (mounted) {
-            setState(() {
-              _position = position;
-            });
-          }
-        });
-        
-        handler.playbackState.listen((state) {
-          if (mounted) {
-            setState(() {
-              isPlaying = state.playing;
-            });
-          }
-        });
-        
-        print('✅ Audio streams connected');
-      } else {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _listenToAudioStreams();
-        });
-      }
-    });
+  Future.delayed(const Duration(milliseconds: 500), () {
+    if (audioHandler is MyAudioHandler) {
+      final handler = audioHandler as MyAudioHandler;
+      
+      // 🔥 DURATION - ab kaam karega
+      handler.durationStream.listen((duration) {
+        if (mounted && duration != null) {
+          setState(() {
+            _duration = duration;
+          });
+        }
+      });
+      
+      // 🔥 POSITION - ab kaam karega
+      handler.positionStream.listen((position) {
+        if (mounted) {
+          setState(() {
+            _position = position;
+          });
+        }
+      });
+      
+      // 🔥 PLAYBACK STATE
+      handler.playbackState.listen((state) {
+        if (mounted) {
+          setState(() {
+            isPlaying = state.playing;
+          });
+        }
+      });
+      
+      print('✅ Audio streams connected');
+    } else {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _listenToAudioStreams();
+      });
+    }
+  });
   }
-
+   
   // ============================================================
   // EQUALIZER FUNCTIONS
   // ============================================================
