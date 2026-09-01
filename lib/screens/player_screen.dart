@@ -165,7 +165,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // ============================================================
   Future<void> _initAudioService() async {
     try {
-      await initAudioService();
+      audioHandler = await initAudioService();
       debugPrint('✅ Audio service initialized successfully');
     } catch (e) {
       debugPrint('❌ Audio service error: $e');
