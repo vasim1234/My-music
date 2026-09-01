@@ -130,6 +130,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
     _loadSavedData();
     _initAudioService();
+    _listenToAudioStreams();
     
     Future.delayed(const Duration(milliseconds: 800), () {
       print('🔊 Audio service ready check');
@@ -149,6 +150,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
+  // ============================================================
+  // AUDIO SERVICE INITIALIZATION
+  // ============================================================
   Future<void> _initAudioService() async {
     try {
       print('🔊 Initializing audio service...');
@@ -158,6 +162,47 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     } catch (e) {
       print('❌ Audio service error: $e');
     }
+  }
+
+  // ============================================================
+  // LISTEN TO AUDIO STREAMS
+  // ============================================================
+  void _listenToAudioStreams() {
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (audioHandler is MyAudioHandler) {
+        final handler = audioHandler as MyAudioHandler;
+        
+        handler.durationStream.listen((duration) {
+          if (mounted && duration != null) {
+            setState(() {
+              _duration = duration;
+            });
+          }
+        });
+        
+        handler.positionStream.listen((position) {
+          if (mounted) {
+            setState(() {
+              _position = position;
+            });
+          }
+        });
+        
+        handler.playerStateStream.listen((state) {
+          if (mounted) {
+            setState(() {
+              isPlaying = state.playing;
+            });
+          }
+        });
+        
+        print('✅ Audio streams connected');
+      } else {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _listenToAudioStreams();
+        });
+      }
+    });
   }
 
   // ============================================================
@@ -856,6 +901,162 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
+  // SLEEP TIMER
+  // ============================================================
+  void _startSleepTimer(int minutes) {
+    _cancelSleepTimer();
+    setState(() {
+      _sleepTimerActive = true;
+      _sleepTimerMinutes = minutes;
+    });
+    
+    _sleepTimer = Timer(Duration(minutes: minutes), () {
+      if (mounted) {
+        setState(() {
+          _sleepTimerActive = false;
+          _sleepTimerMinutes = 0;
+        });
+        audioHandler?.pause();
+        setState(() => isPlaying = false);
+        _saveData();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⏰ Sleep timer: Playback stopped'),
+            backgroundColor: Color(0xFFFF9F43),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    });
+  }
+
+  void _cancelSleepTimer() {
+    _sleepTimer?.cancel();
+    setState(() {
+      _sleepTimerActive = false;
+      _sleepTimerMinutes = 0;
+    });
+  }
+
+  void _showSleepTimerDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _bgColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              height: 300,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [Color(0xFFFF9F43), Color(0xFFE17055)]),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.timer, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Sleep Timer', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const Spacer(),
+                      if (_sleepTimerActive)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text('${_sleepTimerMinutes}m', style: const TextStyle(color: Colors.green, fontSize: 12)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Stop playback after:', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [5, 10, 15, 20, 30, 45, 60].map((minutes) {
+                      return GestureDetector(
+                        onTap: () {
+                          _startSleepTimer(minutes);
+                          setModalState(() {});
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            gradient: _sleepTimerActive && _sleepTimerMinutes == minutes
+                                ? LinearGradient(colors: [Color(0xFFFF9F43), Color(0xFFE17055)])
+                                : null,
+                            color: _sleepTimerActive && _sleepTimerMinutes == minutes ? null : _cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _sleepTimerActive && _sleepTimerMinutes == minutes
+                                  ? Colors.transparent
+                                  : Colors.grey.shade700,
+                            ),
+                          ),
+                          child: Text(
+                            '$minutes min',
+                            style: TextStyle(
+                              color: _sleepTimerActive && _sleepTimerMinutes == minutes
+                                  ? Colors.white
+                                  : Colors.white70,
+                              fontWeight: _sleepTimerActive && _sleepTimerMinutes == minutes
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_sleepTimerActive)
+                    Center(
+                      child: GestureDetector(
+                        onTap: () {
+                          _cancelSleepTimer();
+                          setModalState(() {});
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.red.withOpacity(0.5)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.cancel, color: Colors.red, size: 18),
+                              SizedBox(width: 8),
+                              Text('Cancel Timer', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ============================================================
   // AUDIO PLAYBACK
   // ============================================================
   Future<void> _pickSongs() async {
@@ -942,6 +1143,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           cleanName,
           'Luna Echo',
         );
+        
+        await Future.delayed(const Duration(milliseconds: 500));
         
         if (mounted) {
           setState(() => isPlaying = true);
@@ -1973,7 +2176,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   isActive: _sleepTimerActive,
                   activeColor: const Color(0xFFFF9F43),
                   size: 18,
-                  onTap: () => _showSleepTimerDialog(),
+                  onTap: _showSleepTimerDialog,
                 ),
               ],
             ),
@@ -2031,9 +2234,17 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                           ),
                         ],
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white70),
-                        onPressed: () => Navigator.pop(context),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            onPressed: _clearQueue,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white70),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -2140,95 +2351,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // ============================================================
-  // SLEEP TIMER
-  // ============================================================
-  void _startSleepTimer(int minutes) {
-    setState(() {
-      _sleepTimerActive = true;
-      _sleepTimerMinutes = minutes;
-    });
-    _sleepTimer = Timer(Duration(minutes: minutes), () {
-      if (mounted) {
-        setState(() {
-          _sleepTimerActive = false;
-          _sleepTimerMinutes = 0;
-        });
-        audioHandler?.stop();
-        setState(() => isPlaying = false);
-        _saveData();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⏰ Sleep timer stopped'), backgroundColor: Color(0xFFFF9F43)),
-        );
-      }
-    });
-  }
-
-  void _cancelSleepTimer() {
-    _sleepTimer?.cancel();
-    setState(() {
-      _sleepTimerActive = false;
-      _sleepTimerMinutes = 0;
-    });
-    _saveData();
-  }
-
-  void _showSleepTimerDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: _cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Sleep Timer', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildTimerOption(15),
-            _buildTimerOption(30),
-            _buildTimerOption(60),
-            _buildTimerOption(90),
-            if (_sleepTimerActive)
-              ListTile(
-                leading: const Icon(Icons.stop, color: Color(0xFFFF6B6B)),
-                title: const Text('Cancel Timer', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  _cancelSleepTimer();
-                  Navigator.pop(context);
-                },
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.grey)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimerOption(int minutes) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: _primaryGradient),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.timer, color: Colors.white, size: 18),
-      ),
-      title: Text('$minutes minutes', style: const TextStyle(color: Colors.white)),
-      trailing: _sleepTimerActive && _sleepTimerMinutes == minutes
-          ? Icon(Icons.check_circle, color: _accentColor)
-          : null,
-      onTap: () {
-        _startSleepTimer(minutes);
-        Navigator.pop(context);
-      },
-    );
-  }
-
   String _getAppBarTitle() {
     switch (_selectedIndex) {
       case 1: return 'Favorites';
@@ -2238,12 +2360,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
+  // ============================================================
+  // BUILD METHOD
+  // ============================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bgColor,
       appBar: AppBar(
-        title: Text(_getAppBarTitle(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+        title: Text(_getAppBarTitle(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
