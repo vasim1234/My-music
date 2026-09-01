@@ -22,7 +22,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   bool isShuffle = false;
   int repeatMode = 0;
   
-  // ===== MASTER LIST =====
   List<PlatformFile> _masterList = [];
   List<PlatformFile> _playlist = [];
   List<PlatformFile> _favorites = [];
@@ -42,11 +41,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   bool _sleepTimerActive = false;
   int _sleepTimerMinutes = 0;
 
-  // ===== CUSTOM PLAYLISTS =====
   Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
 
-  // ===== EQUALIZER =====
+  // Equalizer
   bool _isEqActive = false;
   String _currentEqPreset = 'Normal';
   final List<String> _bandLabels = ['Bass', 'Mid', 'Treble'];
@@ -142,15 +140,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
-  // ============================================================
-  // AUDIO SERVICE INITIALIZATION
-  // ============================================================
   Future<void> _initAudioService() async {
     try {
       audioHandler = await initAudioService();
-      debugPrint('✅ Audio service initialized successfully');
+      print('✅ Audio service initialized successfully');
     } catch (e) {
-      debugPrint('❌ Audio service error: $e');
+      print('❌ Audio service error: $e');
     }
   }
 
@@ -408,7 +403,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       await prefs.setString('customPlaylists', jsonEncode(playlistMap));
       
     } catch (e) {
-      debugPrint('❌ Error saving data: $e');
+      print('❌ Error saving data: $e');
     }
   }
 
@@ -509,7 +504,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       
       setState(() {});
     } catch (e) {
-      debugPrint('❌ Error loading data: $e');
+      print('❌ Error loading data: $e');
     }
   }
 
@@ -850,7 +845,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // AUDIO PLAYBACK - FIXED
+  // AUDIO PLAYBACK
   // ============================================================
   Future<void> _pickSongs() async {
     try {
@@ -890,7 +885,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
-  // ===== FIX: Play current song =====
   Future<void> _playCurrentSongInQueue() async {
     if (_playlist.isEmpty) return;
     
@@ -917,16 +911,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         }
       }
     } catch (e) {
-      debugPrint('Error playing song: $e');
+      print('Error playing song: $e');
     }
   }
 
-  // ===== FIX: Play specific song =====
   Future<void> _playSpecificSong(PlatformFile song, {List<PlatformFile>? playlist}) async {
-    debugPrint('🎵 Playing song: ${song.name}');
+    print('🎵 Playing song: ${song.name}');
     
     if (playlist != null && playlist.isNotEmpty) {
-      debugPrint('📋 Playlist size: ${playlist.length}');
+      print('📋 Playlist size: ${playlist.length}');
       setState(() {
         _playlist = List.from(playlist);
         _currentIndex = _playlist.indexOf(song);
@@ -945,7 +938,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
     _saveData();
     await _playCurrentSongInQueue();
-    debugPrint('✅ Song playing initiated');
+    print('✅ Song playing initiated');
   }
 
   Future<void> _playNextSong() async {
@@ -992,7 +985,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _saveData();
       }
     } catch (e) {
-      debugPrint('Error toggling play/pause: $e');
+      print('Error toggling play/pause: $e');
     }
   }
 
@@ -1560,7 +1553,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 icon: const Icon(Icons.close, color: Colors.white54, size: 18),
                                 onPressed: () => _removeFromPlaylist(playlistName, song),
                               ),
-                              // ===== FIX: Play full playlist =====
                               onTap: () => _playSpecificSong(song, playlist: songs),
                             ),
                           );
