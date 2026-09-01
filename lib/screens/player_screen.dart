@@ -17,14 +17,12 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   
-  // ===== NO AudioPlayer HERE - Using audioHandler =====
-  
   bool isPlaying = false;
   bool is3DMode = false;
   bool isShuffle = false;
   int repeatMode = 0;
   
-  // ===== MASTER LIST - All songs safe =====
+  // ===== MASTER LIST =====
   List<PlatformFile> _masterList = [];
   List<PlatformFile> _playlist = [];
   List<PlatformFile> _favorites = [];
@@ -48,7 +46,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
 
-  // Equalizer - Using audioHandler
+  // ===== EQUALIZER =====
   bool _isEqActive = false;
   String _currentEqPreset = 'Normal';
   final List<String> _bandLabels = ['Bass', 'Mid', 'Treble'];
@@ -134,22 +132,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
     _loadSavedData();
     _initAudioService();
-
-    // Listen to audio handler position updates
-    _startPositionListener();
-  }
-
-  void _startPositionListener() {
-    // Position updates from audio handler
-    if (audioHandler is MyAudioHandler) {
-      // We'll use a timer to update position
-      Timer.periodic(const Duration(milliseconds: 500), (timer) {
-        if (mounted && audioHandler is MyAudioHandler) {
-          // Update position from audio handler
-          // This will be implemented via just_audio streams
-        }
-      });
-    }
   }
 
   @override
@@ -173,11 +155,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // EQUALIZER FUNCTIONS - Using audioHandler
+  // EQUALIZER FUNCTIONS
   // ============================================================
-    Future<void> _applyEqualizer() async {
+  Future<void> _applyEqualizer() async {
     if (!_isEqActive) {
-      await audioHandler.setVolume(_baseVolume);
+      if (audioHandler is MyAudioHandler) {
+        await (audioHandler as MyAudioHandler).setVolume(_baseVolume);
+      }
       return;
     }
     
@@ -185,13 +169,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     double mid = _currentEqValues[1];
     double treble = _currentEqValues[2];
     
-    // Yahan aapko newVolume define karna hoga (example ke liye _baseVolume rakha hai)
-    double newVolume = _baseVolume; 
+    double volumeEffect = 1.0 + (bass + mid + treble) * 0.015;
+    double newVolume = (_baseVolume * volumeEffect).clamp(0.0, 1.0);
     
     if (audioHandler is MyAudioHandler) {
       await (audioHandler as MyAudioHandler).setVolume(newVolume);
     }
-  } // <-- Ye closing bracket missing tha
+  }
 
   Future<void> _resetEqualizer() async {
     setState(() {
@@ -696,7 +680,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   const Divider(color: Colors.white24),
                   const SizedBox(height: 8),
                   
-                  // Select All & Add Button Area
                   Row(
                     children: [
                       Checkbox(
@@ -717,7 +700,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         style: const TextStyle(color: Colors.white70, fontSize: 13),
                       ),
                       const Spacer(),
-                      
                       if (selectedSongs.isNotEmpty)
                         Container(
                           height: 35,
@@ -754,7 +736,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   
                   const SizedBox(height: 8),
                   
-                  // Songs List
                   Expanded(
                     child: ListView.builder(
                       itemCount: availableSongs.length,
@@ -869,7 +850,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // AUDIO PLAYBACK - Using audioHandler
+  // AUDIO PLAYBACK
   // ============================================================
   Future<void> _pickSongs() async {
     try {
@@ -1634,7 +1615,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               setState(() => _volume = value);
                               _baseVolume = value;
                               if (audioHandler is MyAudioHandler) {
-  await (audioHandler as MyAudioHandler).setVolume(value);
+                                await (audioHandler as MyAudioHandler).setVolume(value);
                               }
                               _saveData();
                             },
@@ -1881,10 +1862,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     setState(() => is3DMode = !is3DMode);
                     if (is3DMode) {
                       if (audioHandler is MyAudioHandler) {
-  await (audioHandler as MyAudioHandler).setVolume(0.9);
-}
-if (audioHandler is MyAudioHandler) {
-  await (audioHandler as MyAudioHandler).setVolume(_volume);
+                        await (audioHandler as MyAudioHandler).setVolume(0.9);
+                      }
+                    } else {
+                      if (audioHandler is MyAudioHandler) {
+                        await (audioHandler as MyAudioHandler).setVolume(_volume);
+                      }
                     }
                     _saveData();
                   },
