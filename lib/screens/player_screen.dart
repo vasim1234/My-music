@@ -898,173 +898,198 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   Future<void> _playCurrentSongInQueue() async {
-    if (_playlist.isEmpty) {
-      print('⚠️ Playlist is empty');
-      return;
-    }
+  if (_playlist.isEmpty) {
+    print('⚠️ Playlist is empty');
+    return;
+  }
+  
+  try {
+    final currentFile = _playlist[_currentIndex];
+    String cleanName = _cleanSongName(currentFile.name);
+    print('🎵 Playing: $cleanName');
+    print('📁 Path: ${currentFile.path}');
     
-    try {
-      final currentFile = _playlist[_currentIndex];
-      String cleanName = _cleanSongName(currentFile.name);
-      print('🎵 Playing: $cleanName');
-      print('📁 Path: ${currentFile.path}');
+    if (!_recent.contains(currentFile)) {
+      _recent.insert(0, currentFile);
+      if (_recent.length > 50) _recent.removeLast();
+      _saveData();
+    }
+
+    // ===== CHECK IF audioHandler IS INITIALIZED =====
+    if (audioHandler == null) {
+      print('⚠️ audioHandler is null, initializing...');
+      await _initAudioService();
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    // ===== CHECK IF FILE EXISTS =====
+    if (currentFile.path != null) {
+      final file = File(currentFile.path!);
+      if (!file.existsSync()) {
+        print('❌ File does NOT exist: ${currentFile.path}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ File not found!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      print('✅ File exists');
+    }
+
+    if (audioHandler is MyAudioHandler) {
+      print('✅ audioHandler is MyAudioHandler');
+      await (audioHandler as MyAudioHandler).playSong(
+        currentFile.path!,
+        cleanName,
+        'Luna Echo',
+      );
       
-      if (!_recent.contains(currentFile)) {
-        _recent.insert(0, currentFile);
-        if (_recent.length > 50) _recent.removeLast();
+      if (mounted) {
+        setState(() => isPlaying = true);
         _saveData();
+        print('✅ Song playing: $cleanName');
       }
-
-      // ===== CHECK IF audioHandler IS INITIALIZED =====
-      if (audioHandler == null) {
-        print('⚠️ audioHandler is null, initializing...');
-        await _initAudioService();
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-
+    } else {
+      print('❌ audioHandler is NOT MyAudioHandler');
+      print('🔍 audioHandler type: ${audioHandler.runtimeType}');
+      // Try to reinitialize
+      await _initAudioService();
+      await Future.delayed(const Duration(milliseconds: 500));
+      // Retry
       if (audioHandler is MyAudioHandler) {
-        print('✅ audioHandler is MyAudioHandler');
         await (audioHandler as MyAudioHandler).playSong(
           currentFile.path!,
           cleanName,
           'Luna Echo',
         );
-        
         if (mounted) {
           setState(() => isPlaying = true);
           _saveData();
-          print('✅ Song playing: $cleanName');
-        }
-      } else {
-        print('❌ audioHandler is NOT MyAudioHandler');
-        print('🔍 audioHandler type: ${audioHandler.runtimeType}');
-        // Try to reinitialize
-        await _initAudioService();
-        await Future.delayed(const Duration(milliseconds: 500));
-        // Retry
-        if (audioHandler is MyAudioHandler) {
-          await (audioHandler as MyAudioHandler).playSong(
-            currentFile.path!,
-            cleanName,
-            'Luna Echo',
-          );
-          if (mounted) {
-            setState(() => isPlaying = true);
-            _saveData();
-          }
         }
       }
-    } catch (e) {
-      print('❌ Error playing song: $e');
     }
+  } catch (e) {
+    print('❌ Error playing song: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('❌ Error playing: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
 
-  Future<void> _playSpecificSong(PlatformFile song, {List<PlatformFile>? playlist}) async {
-    print('🎵 Playing song: ${song.name}');
-    print('📁 Path: ${song.path}');
-    
-    if (playlist != null && playlist.isNotEmpty) {
-      print('📋 Playlist size: ${playlist.length}');
-      setState(() {
-        _playlist = List.from(playlist);
-        _currentIndex = _playlist.indexOf(song);
-        if (_currentIndex == -1) _currentIndex = 0;
-      });
-    } else {
-      int index = _playlist.indexOf(song);
-      if (index != -1) {
-        setState(() => _currentIndex = index);
-      } else {
-        setState(() {
-          _playlist.add(song);
-          _currentIndex = _playlist.length - 1;
-        });
-      }
-    }
-    _saveData();
-    await _playCurrentSongInQueue();
-    print('✅ Song playing initiated');
-  }
-
-  Future<void> _playNextSong() async {
-    if (_playlist.isEmpty) return;
-    
-    if (isShuffle && _playlist.length > 1) {
-      int newIndex;
-      do {
-        newIndex = DateTime.now().millisecondsSinceEpoch % _playlist.length;
-      } while (newIndex == _currentIndex);
-      setState(() => _currentIndex = newIndex);
+Future<void> _playSpecificSong(PlatformFile song, {List<PlatformFile>? playlist}) async {
+  print('🎵 _playSpecificSong called');
+  print('🎵 Song: ${song.name}');
+  print('📁 Path: ${song.path}');
+  
+  if (playlist != null && playlist.isNotEmpty) {
+    print('📋 Playlist provided with ${playlist.length} songs');
+    setState(() {
+      _playlist = List.from(playlist);
+      _currentIndex = _playlist.indexOf(song);
+      if (_currentIndex == -1) _currentIndex = 0;
+    });
+  } else {
+    int index = _playlist.indexOf(song);
+    if (index != -1) {
+      setState(() => _currentIndex = index);
     } else {
       setState(() {
-        _currentIndex = (_currentIndex + 1) % _playlist.length;
+        _playlist.add(song);
+        _currentIndex = _playlist.length - 1;
       });
     }
-    _saveData();
-    await _playCurrentSongInQueue();
   }
+  _saveData();
+  
+  // ===== PLAY THE SONG =====
+  await _playCurrentSongInQueue();
+  print('✅ _playSpecificSong completed');
+}
 
-  Future<void> _playPreviousSong() async {
-    if (_playlist.isEmpty) return;
+Future<void> _playNextSong() async {
+  if (_playlist.isEmpty) return;
+  
+  if (isShuffle && _playlist.length > 1) {
+    int newIndex;
+    do {
+      newIndex = DateTime.now().millisecondsSinceEpoch % _playlist.length;
+    } while (newIndex == _currentIndex);
+    setState(() => _currentIndex = newIndex);
+  } else {
     setState(() {
-      _currentIndex = (_currentIndex - 1 + _playlist.length) % _playlist.length;
+      _currentIndex = (_currentIndex + 1) % _playlist.length;
     });
-    _saveData();
-    await _playCurrentSongInQueue();
   }
+  _saveData();
+  await _playCurrentSongInQueue();
+}
 
-  Future<void> _togglePlayPause() async {
-    if (_playlist.isEmpty) {
-      await _pickSongs();
-      return;
+Future<void> _playPreviousSong() async {
+  if (_playlist.isEmpty) return;
+  setState(() {
+    _currentIndex = (_currentIndex - 1 + _playlist.length) % _playlist.length;
+  });
+  _saveData();
+  await _playCurrentSongInQueue();
+}
+
+Future<void> _togglePlayPause() async {
+  if (_playlist.isEmpty) {
+    await _pickSongs();
+    return;
+  }
+  
+  try {
+    if (audioHandler == null) {
+      await _initAudioService();
+      await Future.delayed(const Duration(milliseconds: 500));
     }
     
-    try {
-      if (audioHandler == null) {
-        await _initAudioService();
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-      
-      if (isPlaying) {
-        await audioHandler.pause();
-        if (mounted) setState(() => isPlaying = false);
-        _saveData();
-      } else {
-        await audioHandler.play();
-        if (mounted) setState(() => isPlaying = true);
-        _saveData();
-      }
-    } catch (e) {
-      print('❌ Error toggling play/pause: $e');
+    if (isPlaying) {
+      await audioHandler.pause();
+      if (mounted) setState(() => isPlaying = false);
+      _saveData();
+    } else {
+      await audioHandler.play();
+      if (mounted) setState(() => isPlaying = true);
+      _saveData();
     }
+  } catch (e) {
+    print('❌ Error toggling play/pause: $e');
   }
+}
 
-  Future<void> _seekRelative(int seconds) async {
-    final newPosition = _position + Duration(seconds: seconds);
-    final clampedPosition = newPosition > _duration 
-        ? _duration 
-        : (newPosition < Duration.zero ? Duration.zero : newPosition);
-    await audioHandler.seek(clampedPosition);
-  }
+Future<void> _seekRelative(int seconds) async {
+  final newPosition = _position + Duration(seconds: seconds);
+  final clampedPosition = newPosition > _duration 
+      ? _duration 
+      : (newPosition < Duration.zero ? Duration.zero : newPosition);
+  await audioHandler.seek(clampedPosition);
+}
 
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    final hours = duration.inHours;
-    return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
-  }
+String _formatDuration(Duration duration) {
+  String twoDigits(int n) => n.toString().padLeft(2, '0');
+  final minutes = twoDigits(duration.inMinutes.remainder(60));
+  final seconds = twoDigits(duration.inSeconds.remainder(60));
+  final hours = duration.inHours;
+  return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
+}
 
-  void _toggleFavorite(PlatformFile song) {
-    setState(() {
-      if (_favorites.contains(song)) {
-        _favorites.remove(song);
-      } else {
-        _favorites.add(song);
-      }
-    });
-    _saveData();
-  }
+void _toggleFavorite(PlatformFile song) {
+  setState(() {
+    if (_favorites.contains(song)) {
+      _favorites.remove(song);
+    } else {
+      _favorites.add(song);
+    }
+  });
+  _saveData();
+}
 
   // ============================================================
   // SHUFFLE/REPEAT MENU
