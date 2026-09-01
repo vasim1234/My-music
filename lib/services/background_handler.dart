@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'dart:async';
+import 'dart:io';  // ← ADD THIS
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -32,11 +32,7 @@ class MyAudioHandler extends BaseAudioHandler {
     
     _player.playerStateStream.listen((state) {
       _isPlaying = state.playing;
-      print('🎵 Player state changed: playing=${state.playing}');
-    });
-    
-    _player.positionStream.listen((position) {
-      // Position updates
+      print('🎵 Player state: playing=${state.playing}');
     });
   }
 
@@ -45,18 +41,29 @@ class MyAudioHandler extends BaseAudioHandler {
     await _player.setVolume(_currentVolume);
   }
 
+  // ===== FIXED: playSong with Uri.file =====
   Future<void> playSong(String path, String title, String artist) async {
     print('🎵 playSong called: $title');
     print('📁 Path: $path');
-    print('📁 File exists: ${File(path).existsSync()}');
     
     try {
+      // Check if file exists
+      final file = File(path);
+      if (!file.existsSync()) {
+        print('❌ File does not exist: $path');
+        return;
+      }
+      print('✅ File exists');
+      
       // Stop current song if playing
       await _player.stop();
       print('⏹️ Stopped previous song');
       
-      // Set new audio source
-      await _player.setAudioSource(AudioSource.file(path));
+      // ===== FIX: Use Uri.file for proper path =====
+      final uri = Uri.file(path);
+      print('📁 URI: $uri');
+      
+      await _player.setAudioSource(AudioSource.uri(uri));
       _currentSongPath = path;
       print('📁 Audio source set');
       
@@ -67,6 +74,7 @@ class MyAudioHandler extends BaseAudioHandler {
           album: 'My Music 3D',
           title: title,
           artist: artist,
+          duration: _player.duration,
         ),
       );
       print('📱 Notification updated');
