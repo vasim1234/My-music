@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:flutter/material.dart';  // ← ADD THIS
 
 // Global instance
 late final AudioHandler audioHandler;
@@ -27,7 +28,6 @@ class MyAudioHandler extends BaseAudioHandler {
   MyAudioHandler() {
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
     
-    // Listen to player state
     _player.playerStateStream.listen((state) {
       _isPlaying = state.playing;
     });
@@ -42,17 +42,14 @@ class MyAudioHandler extends BaseAudioHandler {
   // ===== PLAY SONG =====
   Future<void> playSong(String path, String title, String artist) async {
     try {
-      debugPrint('🎵 playSong called: $title');
-      debugPrint('📁 Path: $path');
+      print('🎵 playSong called: $title');
       
       // Stop current song if playing
       await _player.stop();
-      debugPrint('⏹️ Stopped previous song');
       
       // Set new audio source
       await _player.setAudioSource(AudioSource.file(path));
       _currentSongPath = path;
-      debugPrint('📁 Audio source set');
       
       // Update notification
       mediaItem.add(
@@ -63,38 +60,37 @@ class MyAudioHandler extends BaseAudioHandler {
           artist: artist,
         ),
       );
-      debugPrint('📱 Notification updated');
       
       // Apply volume
       await _player.setVolume(_currentVolume);
       
-      // ===== PLAY =====
+      // PLAY
       await _player.play();
       _isPlaying = true;
-      debugPrint('▶️ Playing started');
+      print('▶️ Playing started');
       
     } catch (e) {
-      debugPrint('❌ Play song error: $e');
+      print('❌ Play song error: $e');
     }
   }
 
   @override
   Future<void> play() async {
-    debugPrint('▶️ play() called');
+    print('▶️ play() called');
     await _player.play();
     _isPlaying = true;
   }
 
   @override
   Future<void> pause() async {
-    debugPrint('⏸️ pause() called');
+    print('⏸️ pause() called');
     await _player.pause();
     _isPlaying = false;
   }
 
   @override
   Future<void> stop() async {
-    debugPrint('⏹️ stop() called');
+    print('⏹️ stop() called');
     await _player.stop();
     _isPlaying = false;
     await super.stop();
