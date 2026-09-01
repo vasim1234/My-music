@@ -21,9 +21,21 @@ Future<AudioHandler> initAudioService() async {
 class MyAudioHandler extends BaseAudioHandler {
   final AudioPlayer _player = AudioPlayer();
   String? _currentSongPath;
+  double _currentVolume = 1.0;
 
   MyAudioHandler() {
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
+  }
+
+  // ===== SET VOLUME =====
+  Future<void> setVolume(double volume) async {
+    _currentVolume = volume.clamp(0.0, 1.0);
+    await _player.setVolume(_currentVolume);
+  }
+
+  // ===== GET VOLUME =====
+  double getVolume() {
+    return _currentVolume;
   }
 
   // ===== PLAY SONG =====
@@ -45,6 +57,9 @@ class MyAudioHandler extends BaseAudioHandler {
           artist: artist,
         ),
       );
+      
+      // Apply volume
+      await _player.setVolume(_currentVolume);
       
       // Play
       await _player.play();
