@@ -172,7 +172,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     if (audioHandler is MyAudioHandler) {
       final handler = audioHandler as MyAudioHandler;
       
-      // 🔥 DURATION - ab kaam karega
+      // Duration
       handler.durationStream.listen((duration) {
         if (mounted && duration != null) {
           setState(() {
@@ -181,7 +181,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         }
       });
       
-      // 🔥 POSITION - ab kaam karega
+      // Position - ye stream se position update hogi
       handler.positionStream.listen((position) {
         if (mounted) {
           setState(() {
@@ -190,7 +190,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         }
       });
       
-      // 🔥 PLAYBACK STATE
+      // Playback State
       handler.playbackState.listen((state) {
         if (mounted) {
           setState(() {
