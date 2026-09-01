@@ -26,7 +26,8 @@ apply plugin: 'kotlin-android'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
-    compileSdkVersion 33
+    // ===== FIX 1: SDK 34 =====
+    compileSdkVersion 34  // ← CHANGE from 33 to 34
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -45,7 +46,7 @@ android {
     defaultConfig {
         applicationId "com.music.app.my_music"
         minSdkVersion 21
-        targetSdkVersion 33
+        targetSdkVersion 34  // ← CHANGE from 33 to 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
