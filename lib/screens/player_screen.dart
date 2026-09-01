@@ -850,7 +850,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // AUDIO PLAYBACK
+  // AUDIO PLAYBACK - FIXED
   // ============================================================
   Future<void> _pickSongs() async {
     try {
@@ -890,6 +890,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
+  // ===== FIX: Play current song =====
   Future<void> _playCurrentSongInQueue() async {
     if (_playlist.isEmpty) return;
     
@@ -920,8 +921,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
+  // ===== FIX: Play specific song =====
   Future<void> _playSpecificSong(PlatformFile song, {List<PlatformFile>? playlist}) async {
+    debugPrint('🎵 Playing song: ${song.name}');
+    
     if (playlist != null && playlist.isNotEmpty) {
+      debugPrint('📋 Playlist size: ${playlist.length}');
       setState(() {
         _playlist = List.from(playlist);
         _currentIndex = _playlist.indexOf(song);
@@ -940,6 +945,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
     _saveData();
     await _playCurrentSongInQueue();
+    debugPrint('✅ Song playing initiated');
   }
 
   Future<void> _playNextSong() async {
@@ -1410,7 +1416,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                onTap: () => _playSpecificSong(song),
+                                onTap: () => _playSpecificSong(song, playlist: _masterList),
                               ),
                             );
                           }).toList(),
@@ -1554,6 +1560,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 icon: const Icon(Icons.close, color: Colors.white54, size: 18),
                                 onPressed: () => _removeFromPlaylist(playlistName, song),
                               ),
+                              // ===== FIX: Play full playlist =====
                               onTap: () => _playSpecificSong(song, playlist: songs),
                             ),
                           );
