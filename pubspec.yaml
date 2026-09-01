@@ -10,12 +10,19 @@ dependencies:
   flutter:
     sdk: flutter
   
+  # Audio - SINGLE VERSION
   audio_service: ^0.18.9
   just_audio: ^0.9.35
   rxdart: ^0.27.7
+  
+  # File & Storage
   file_picker: ^5.5.0
   shared_preferences: ^2.2.2
+  
+  # Permissions
   permission_handler: ^10.4.3
+  
+  # UI
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
@@ -25,5 +32,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/icon/
