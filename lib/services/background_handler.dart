@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:rxdart/rxdart.dart';
 
 // 🔥 GLOBAL AUDIO HANDLER
 AudioHandler? audioHandler;
@@ -33,12 +32,11 @@ class MyAudioHandler extends BaseAudioHandler {
 
     // 🔥 POSITION STREAM
     _player.positionStream.listen((position) {
-      // Update playback state with position
       final currentPlaybackState = playbackState.value;
       playbackState.add(
         currentPlaybackState.copyWith(
           position: position,
-          processingState: _getProcessingState(_player.processingState),
+          processingState: _getAudioProcessingState(_player.processingState),
           playing: _player.playing,
           bufferedPosition: _player.bufferedPosition,
           speed: _player.speed,
@@ -52,7 +50,7 @@ class MyAudioHandler extends BaseAudioHandler {
       final currentPlaybackState = playbackState.value;
       playbackState.add(
         currentPlaybackState.copyWith(
-          processingState: _getProcessingState(state.processingState),
+          processingState: _getAudioProcessingState(state.processingState),
           playing: state.playing,
         ),
       );
@@ -62,7 +60,6 @@ class MyAudioHandler extends BaseAudioHandler {
     _player.processingStateStream.listen((state) {
       if (state == ProcessingState.completed) {
         print('🎵 Song completed');
-        // Handle song completion
         _onSongComplete();
       }
     });
@@ -71,26 +68,26 @@ class MyAudioHandler extends BaseAudioHandler {
     print('✅ Audio player initialized');
   }
 
-  ProcessingState _getProcessingState(ProcessingState state) {
+  // 🔥 Convert just_audio ProcessingState to audio_service AudioProcessingState
+  AudioProcessingState _getAudioProcessingState(ProcessingState state) {
     switch (state) {
       case ProcessingState.idle:
-        return ProcessingState.idle;
+        return AudioProcessingState.idle;
       case ProcessingState.loading:
-        return ProcessingState.loading;
+        return AudioProcessingState.loading;
       case ProcessingState.buffering:
-        return ProcessingState.buffering;
+        return AudioProcessingState.buffering;
       case ProcessingState.ready:
-        return ProcessingState.ready;
+        return AudioProcessingState.ready;
       case ProcessingState.completed:
-        return ProcessingState.completed;
+        return AudioProcessingState.completed;
       default:
-        return ProcessingState.idle;
+        return AudioProcessingState.idle;
     }
   }
 
   void _onSongComplete() {
     // Handle next song logic
-    // This will be called from PlayerScreen
   }
 
   // 🔥 MAIN PLAY SONG METHOD
@@ -100,7 +97,6 @@ class MyAudioHandler extends BaseAudioHandler {
       print('📁 Path: $path');
       print('🎵 Title: $title');
       
-      // Check if file exists
       final file = File(path);
       if (!await file.exists()) {
         print('❌ File does not exist: $path');
@@ -108,20 +104,17 @@ class MyAudioHandler extends BaseAudioHandler {
       }
       
       print('✅ File exists: ${file.path}');
-      print('📏 File size: ${await file.length()} bytes');
 
-      // Create URI and load audio
       final uri = Uri.file(path);
       print('📁 Loading audio from URI: $uri');
       
       await _player.setAudioSource(AudioSource.uri(uri));
       print('✅ Audio source set successfully');
 
-      // Get duration
       final duration = _player.duration;
       print('⏱️ Duration: $duration');
 
-      // Update media item
+      // 🔥 FIX: Use correct MediaItem constructor
       final item = MediaItem(
         id: path,
         title: title,
@@ -132,15 +125,14 @@ class MyAudioHandler extends BaseAudioHandler {
       mediaItem.add(item);
       print('✅ Media item updated');
 
-      // Start playing
       await _player.play();
       print('✅ Play command sent');
 
-      // Update playback state
+      // 🔥 FIX: Update playback state with correct types
       playbackState.add(
         playbackState.value.copyWith(
           playing: true,
-          processingState: ProcessingState.ready,
+          processingState: AudioProcessingState.ready,
           position: Duration.zero,
           bufferedPosition: Duration.zero,
           speed: 1.0,
@@ -156,7 +148,7 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  // 🔥 PLAY/PAUSE
+  // 🔥 BASIC CONTROLS
   @override
   Future<void> play() async {
     try {
@@ -218,13 +210,11 @@ class MyAudioHandler extends BaseAudioHandler {
 
   @override
   Future<void> skipToNext() async {
-    // Handle skip to next
     print('⏭️ Skip to next');
   }
 
   @override
   Future<void> skipToPrevious() async {
-    // Handle skip to previous
     print('⏮️ Skip to previous');
   }
 
@@ -240,13 +230,14 @@ class MyAudioHandler extends BaseAudioHandler {
     await _player.seek(position - const Duration(seconds: 10));
   }
 
+  // 🔥 FIX: Use correct types for audio_service
   @override
-  Future<void> setRepeatMode(RepeatMode repeatMode) async {
+  Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
     // Handle repeat mode
   }
 
   @override
-  Future<void> setShuffleMode(ShuffleMode shuffleMode) async {
+  Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
     // Handle shuffle mode
   }
 
@@ -285,14 +276,16 @@ class MyAudioHandler extends BaseAudioHandler {
     // Handle queue
   }
 
+  // 🔥 FIX: Correct click method signature
   @override
-  Future<void> setRating(double rating) async {
-    // Handle rating
+  Future<void> click([MediaButton button = MediaButton.media]) async {
+    // Handle click
   }
 
+  // 🔥 FIX: Correct setRating method signature
   @override
-  Future<void> click([MediaAction? action]) async {
-    // Handle click
+  Future<void> setRating(Rating rating, [Map<String, dynamic>? extras]) async {
+    // Handle rating
   }
 
   @override
@@ -305,10 +298,15 @@ class MyAudioHandler extends BaseAudioHandler {
     // Handle task removed
   }
 
+  // 🔥 Dispose correctly
   @override
-  Future<void> stopAndDispose() async {
+  Future<void> stop() async {
+    await _player.stop();
+    await super.stop();
+  }
+
+  Future<void> dispose() async {
     await _player.dispose();
-    await super.stopAndDispose();
   }
 }
 
