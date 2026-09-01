@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'dart:io';  // ← ADD THIS
+import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:flutter/material.dart';
 
 // Global instance
 late final AudioHandler audioHandler;
@@ -34,6 +35,16 @@ class MyAudioHandler extends BaseAudioHandler {
       _isPlaying = state.playing;
       print('🎵 Player state: playing=${state.playing}');
     });
+    
+    // ===== LISTEN TO DURATION =====
+    _player.durationStream.listen((duration) {
+      print('⏱️ Duration: $duration');
+    });
+    
+    // ===== LISTEN TO POSITION =====
+    _player.positionStream.listen((position) {
+      // print('📍 Position: $position');  // Commented to avoid spam
+    });
   }
 
   Future<void> setVolume(double volume) async {
@@ -41,7 +52,7 @@ class MyAudioHandler extends BaseAudioHandler {
     await _player.setVolume(_currentVolume);
   }
 
-  // ===== FIXED: playSong with Uri.file =====
+  // ===== PLAY SONG =====
   Future<void> playSong(String path, String title, String artist) async {
     print('🎵 playSong called: $title');
     print('📁 Path: $path');
@@ -50,19 +61,21 @@ class MyAudioHandler extends BaseAudioHandler {
       // Check if file exists
       final file = File(path);
       if (!file.existsSync()) {
-        print('❌ File does not exist: $path');
+        print('❌ File does NOT exist: $path');
         return;
       }
       print('✅ File exists');
+      print('📁 File size: ${file.lengthSync()} bytes');
       
       // Stop current song if playing
       await _player.stop();
       print('⏹️ Stopped previous song');
       
-      // ===== FIX: Use Uri.file for proper path =====
+      // ===== FIX: Use Uri.file =====
       final uri = Uri.file(path);
       print('📁 URI: $uri');
       
+      // Set audio source
       await _player.setAudioSource(AudioSource.uri(uri));
       _currentSongPath = path;
       print('📁 Audio source set');
@@ -82,21 +95,27 @@ class MyAudioHandler extends BaseAudioHandler {
       // Apply volume
       await _player.setVolume(_currentVolume);
       
-      // PLAY
+      // ===== PLAY =====
       await _player.play();
       _isPlaying = true;
       print('▶️ Playing started');
       
     } catch (e) {
       print('❌ Play song error: $e');
+      print('❌ Stack trace: ${StackTrace.current}');
     }
   }
 
   @override
   Future<void> play() async {
     print('▶️ play() called');
+    if (_player.playing) {
+      print('⚠️ Already playing');
+      return;
+    }
     await _player.play();
     _isPlaying = true;
+    print('▶️ Play resumed');
   }
 
   @override
