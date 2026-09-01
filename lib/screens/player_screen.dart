@@ -175,7 +175,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // ============================================================
   // EQUALIZER FUNCTIONS - Using audioHandler
   // ============================================================
-  Future<void> _applyEqualizer() async {
+    Future<void> _applyEqualizer() async {
     if (!_isEqActive) {
       await audioHandler.setVolume(_baseVolume);
       return;
@@ -185,12 +185,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     double mid = _currentEqValues[1];
     double treble = _currentEqValues[2];
     
+    // Yahan aapko newVolume define karna hoga (example ke liye _baseVolume rakha hai)
+    double newVolume = _baseVolume; 
+    
     if (audioHandler is MyAudioHandler) {
-  await (audioHandler as MyAudioHandler).setVolume(_baseVolume);
-}
-if (audioHandler is MyAudioHandler) {
-  await (audioHandler as MyAudioHandler).setVolume(newVolume);
-  }
+      await (audioHandler as MyAudioHandler).setVolume(newVolume);
+    }
+  } // <-- Ye closing bracket missing tha
 
   Future<void> _resetEqualizer() async {
     setState(() {
