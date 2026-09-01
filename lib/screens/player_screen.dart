@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/album_art.dart';
@@ -18,7 +17,8 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  // ===== NO AudioPlayer HERE - Using audioHandler =====
+  
   bool isPlaying = false;
   bool is3DMode = false;
   bool isShuffle = false;
@@ -48,7 +48,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
 
-  // Equalizer
+  // Equalizer - Using audioHandler
   bool _isEqActive = false;
   String _currentEqPreset = 'Normal';
   final List<String> _bandLabels = ['Bass', 'Mid', 'Treble'];
@@ -119,65 +119,65 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return name;
   }
 
- @override
-void initState() {
-  super.initState();
-  
-  _pulseController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1500),
-  )..repeat(reverse: true);
-  
-  _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
-    CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-  );
+  @override
+  void initState() {
+    super.initState();
+    
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
 
-  _loadSavedData();
+    _loadSavedData();
+    _initAudioService();
 
-  // ===== INITIALIZE AUDIO SERVICE =====
-  _initAudioService();
-
-  _audioPlayer.onDurationChanged.listen((newDuration) {
-    if (mounted) setState(() => _duration = newDuration);
-  });
-  
-  _audioPlayer.onPositionChanged.listen((newPosition) {
-    if (mounted) setState(() => _position = newPosition);
-  });
-  
-  _audioPlayer.onPlayerComplete.listen((_) {
-    _handleSongCompletion();
-  });
-}
-
-@override
-void dispose() {
-  _saveData();
-  _pulseController.dispose();
-  _audioPlayer.dispose();
-  _sleepTimer?.cancel();
-  super.dispose();
-}
-
-// ============================================================
-// AUDIO SERVICE INITIALIZATION
-// ============================================================
-Future<void> _initAudioService() async {
-  try {
-    await initAudioService();
-    debugPrint('✅ Audio service initialized successfully');
-  } catch (e) {
-    debugPrint('❌ Audio service error: $e');
+    // Listen to audio handler position updates
+    _startPositionListener();
   }
-}
+
+  void _startPositionListener() {
+    // Position updates from audio handler
+    if (audioHandler is MyAudioHandler) {
+      // We'll use a timer to update position
+      Timer.periodic(const Duration(milliseconds: 500), (timer) {
+        if (mounted && audioHandler is MyAudioHandler) {
+          // Update position from audio handler
+          // This will be implemented via just_audio streams
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _saveData();
+    _pulseController.dispose();
+    _sleepTimer?.cancel();
+    super.dispose();
+  }
 
   // ============================================================
-  // EQUALIZER FUNCTIONS
+  // AUDIO SERVICE INITIALIZATION
+  // ============================================================
+  Future<void> _initAudioService() async {
+    try {
+      audioHandler = await initAudioService();
+      debugPrint('✅ Audio service initialized successfully');
+    } catch (e) {
+      debugPrint('❌ Audio service error: $e');
+    }
+  }
+
+  // ============================================================
+  // EQUALIZER FUNCTIONS - Using audioHandler
   // ============================================================
   Future<void> _applyEqualizer() async {
     if (!_isEqActive) {
-      await _audioPlayer.setBalance(0.0);
-      await _audioPlayer.setVolume(_baseVolume);
+      await audioHandler.setVolume(_baseVolume);
       return;
     }
     
@@ -185,11 +185,8 @@ Future<void> _initAudioService() async {
     double mid = _currentEqValues[1];
     double treble = _currentEqValues[2];
     
-    double balanceEffect = (treble - bass) * 0.04;
     double volumeEffect = 1.0 + (bass + mid + treble) * 0.015;
-    
-    await _audioPlayer.setBalance(balanceEffect.clamp(-1.0, 1.0));
-    await _audioPlayer.setVolume((_baseVolume * volumeEffect).clamp(0.0, 1.0));
+    await audioHandler.setVolume((_baseVolume * volumeEffect).clamp(0.0, 1.0));
   }
 
   Future<void> _resetEqualizer() async {
@@ -717,7 +714,6 @@ Future<void> _initAudioService() async {
                       ),
                       const Spacer(),
                       
-                      // Add Button
                       if (selectedSongs.isNotEmpty)
                         Container(
                           height: 35,
@@ -730,9 +726,7 @@ Future<void> _initAudioService() async {
                               for (var song in selectedSongs) {
                                 _addSongToPlaylist(playlistName, song);
                               }
-                              
                               setState(() {});
-
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text('✅ ${selectedSongs.length} songs added to $playlistName'),
@@ -859,7 +853,7 @@ Future<void> _initAudioService() async {
                 _position = Duration.zero;
                 _duration = Duration.zero;
               });
-              _audioPlayer.stop();
+              audioHandler.stop();
               _saveData();
               Navigator.pop(context);
             },
@@ -871,7 +865,7 @@ Future<void> _initAudioService() async {
   }
 
   // ============================================================
-  // AUDIO PLAYBACK
+  // AUDIO PLAYBACK - Using audioHandler
   // ============================================================
   Future<void> _pickSongs() async {
     try {
@@ -916,6 +910,7 @@ Future<void> _initAudioService() async {
     
     try {
       final currentFile = _playlist[_currentIndex];
+      String cleanName = _cleanSongName(currentFile.name);
       
       if (!_recent.contains(currentFile)) {
         _recent.insert(0, currentFile);
@@ -923,13 +918,13 @@ Future<void> _initAudioService() async {
         _saveData();
       }
 
-      if (currentFile.path != null) {
-        await _audioPlayer.stop();
-        await _audioPlayer.play(DeviceFileSource(currentFile.path!));
-        _baseVolume = _volume;
-        await _audioPlayer.setVolume(_volume);
-        await _audioPlayer.setBalance(is3DMode ? 0.5 : 0.0);
-        await _applyEqualizer();
+      if (currentFile.path != null && audioHandler is MyAudioHandler) {
+        await (audioHandler as MyAudioHandler).playSong(
+          currentFile.path!,
+          cleanName,
+          'Luna Echo',
+        );
+        
         if (mounted) {
           setState(() => isPlaying = true);
           _saveData();
@@ -997,21 +992,16 @@ Future<void> _initAudioService() async {
     
     try {
       if (isPlaying) {
-        await _audioPlayer.pause();
+        await audioHandler.pause();
         if (mounted) setState(() => isPlaying = false);
         _saveData();
       } else {
-        if (_position == Duration.zero && _duration == Duration.zero) {
-          await _playCurrentSongInQueue();
-        } else {
-          await _audioPlayer.resume();
-          if (mounted) setState(() => isPlaying = true);
-          _saveData();
-        }
+        await audioHandler.play();
+        if (mounted) setState(() => isPlaying = true);
+        _saveData();
       }
     } catch (e) {
       debugPrint('Error toggling play/pause: $e');
-      await _playCurrentSongInQueue();
     }
   }
 
@@ -1020,7 +1010,7 @@ Future<void> _initAudioService() async {
     final clampedPosition = newPosition > _duration 
         ? _duration 
         : (newPosition < Duration.zero ? Duration.zero : newPosition);
-    await _audioPlayer.seek(clampedPosition);
+    await audioHandler.seek(clampedPosition);
   }
 
   String _formatDuration(Duration duration) {
@@ -1314,7 +1304,6 @@ Future<void> _initAudioService() async {
   Widget _buildPlaylistsTab() {
     return Column(
       children: [
-        // Create Playlist Button
         Padding(
           padding: const EdgeInsets.all(16),
           child: Container(
@@ -1338,14 +1327,12 @@ Future<void> _initAudioService() async {
           ),
         ),
         
-        // Playlists List
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: _customPlaylists.keys.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) {
-                // ===== ALL SONGS - Fixed =====
                 return Card(
                   color: _cardColor,
                   shape: RoundedRectangleBorder(
@@ -1381,7 +1368,6 @@ Future<void> _initAudioService() async {
                       ),
                       child: const Icon(Icons.library_music, color: Colors.white),
                     ),
-                    // ===== NO TRAILING (Delete button nahi) =====
                     children: _masterList.isEmpty
                         ? [
                             const Padding(
@@ -1439,7 +1425,6 @@ Future<void> _initAudioService() async {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                // ===== NO DELETE BUTTON =====
                                 onTap: () => _playSpecificSong(song),
                               ),
                             );
@@ -1448,7 +1433,6 @@ Future<void> _initAudioService() async {
                 );
               }
               
-              // ===== CUSTOM PLAYLISTS =====
               final playlistIndex = index - 1;
               final playlistName = _customPlaylists.keys.elementAt(playlistIndex);
               final songs = _customPlaylists[playlistName]!;
@@ -1645,7 +1629,7 @@ Future<void> _initAudioService() async {
                               setModalState(() => _volume = value);
                               setState(() => _volume = value);
                               _baseVolume = value;
-                              await _audioPlayer.setVolume(value);
+                              await audioHandler.setVolume(value);
                               _saveData();
                             },
                           ),
@@ -1741,7 +1725,6 @@ Future<void> _initAudioService() async {
             
             const SizedBox(height: 20),
             
-            // ===== ALBUM ART =====
             AlbumArt(
               isPlaying: isPlaying,
               is3DMode: is3DMode,
@@ -1773,7 +1756,7 @@ Future<void> _initAudioService() async {
                     value: _position.inSeconds.toDouble().clamp(0.0, _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0),
                     onChanged: (value) async {
                       final position = Duration(seconds: value.toInt());
-                      await _audioPlayer.seek(position);
+                      await audioHandler.seek(position);
                       setState(() => _position = position);
                     },
                   ),
@@ -1891,11 +1874,9 @@ Future<void> _initAudioService() async {
                   onTap: () async {
                     setState(() => is3DMode = !is3DMode);
                     if (is3DMode) {
-                      await _audioPlayer.setBalance(0.5);
-                      await _audioPlayer.setVolume(0.9);
+                      await audioHandler.setVolume(0.9);
                     } else {
-                      await _audioPlayer.setBalance(0.0);
-                      await _audioPlayer.setVolume(_volume);
+                      await audioHandler.setVolume(_volume);
                     }
                     _saveData();
                   },
@@ -2115,7 +2096,7 @@ Future<void> _initAudioService() async {
           _sleepTimerActive = false;
           _sleepTimerMinutes = 0;
         });
-        _audioPlayer.stop();
+        audioHandler.stop();
         setState(() => isPlaying = false);
         _saveData();
         ScaffoldMessenger.of(context).showSnackBar(
