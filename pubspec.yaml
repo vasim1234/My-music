@@ -10,29 +10,32 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # Audio & File
-  audioplayers: ^5.0.0
-  file_picker: ^5.5.0
-  permission_handler: ^10.4.3
-  
-  # Background Audio
-  audio_service: ^0.18.10
-  just_audio: ^0.9.36
+  # Audio Service
+  audio_service: ^0.18.9
+  just_audio: ^0.9.35
+  rxdart: ^0.27.7
   audio_session: ^0.1.17
   
-  # UI & Utils
-  cupertino_icons: ^1.0.6
+  # File & Storage
+  file_picker: ^5.5.0
   shared_preferences: ^2.2.2
+  
+  # Permissions
+  permission_handler: ^10.4.3
+  
+  # UI
+  cupertino_icons: ^1.0.6
   flutter_native_splash: ^2.3.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^2.0.0
   flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
+  
   assets:
     - assets/icon/
 
@@ -52,7 +55,7 @@ flutter_native_splash:
   android_gravity: center
   color_dark: "#0A0A0F"
   image_dark: assets/icon/icon.png
-  
+
   android_12:
     color: "#0A0A0F"
     image: assets/icon/icon.png
