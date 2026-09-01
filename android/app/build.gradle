@@ -25,6 +25,9 @@ apply plugin: 'com.android.application'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
+    // ===== ADD NAMESPACE =====
+    namespace = "com.music.app.my_music"  // ← ADD THIS LINE
+    
     compileSdkVersion 34
     ndkVersion flutter.ndkVersion
 
