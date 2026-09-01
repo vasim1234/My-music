@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:flutter/material.dart';  // ← ADD THIS
 
 // Global instance
 late final AudioHandler audioHandler;
 
 Future<AudioHandler> initAudioService() async {
+  print('🔊 initAudioService called');
   return await AudioService.init(
     builder: () => MyAudioHandler(),
     config: const AudioServiceConfig(
@@ -26,30 +26,38 @@ class MyAudioHandler extends BaseAudioHandler {
   bool _isPlaying = false;
 
   MyAudioHandler() {
+    print('🎵 MyAudioHandler created');
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
     
     _player.playerStateStream.listen((state) {
       _isPlaying = state.playing;
+      print('🎵 Player state changed: playing=${state.playing}');
+    });
+    
+    _player.positionStream.listen((position) {
+      // Position updates
     });
   }
 
-  // ===== SET VOLUME =====
   Future<void> setVolume(double volume) async {
     _currentVolume = volume.clamp(0.0, 1.0);
     await _player.setVolume(_currentVolume);
   }
 
-  // ===== PLAY SONG =====
   Future<void> playSong(String path, String title, String artist) async {
+    print('🎵 playSong called: $title');
+    print('📁 Path: $path');
+    print('📁 File exists: ${File(path).existsSync()}');
+    
     try {
-      print('🎵 playSong called: $title');
-      
       // Stop current song if playing
       await _player.stop();
+      print('⏹️ Stopped previous song');
       
       // Set new audio source
       await _player.setAudioSource(AudioSource.file(path));
       _currentSongPath = path;
+      print('📁 Audio source set');
       
       // Update notification
       mediaItem.add(
@@ -60,6 +68,7 @@ class MyAudioHandler extends BaseAudioHandler {
           artist: artist,
         ),
       );
+      print('📱 Notification updated');
       
       // Apply volume
       await _player.setVolume(_currentVolume);
