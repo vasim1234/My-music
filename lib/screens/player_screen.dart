@@ -185,8 +185,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     double mid = _currentEqValues[1];
     double treble = _currentEqValues[2];
     
-    double volumeEffect = 1.0 + (bass + mid + treble) * 0.015;
-    await audioHandler.setVolume((_baseVolume * volumeEffect).clamp(0.0, 1.0));
+    if (audioHandler is MyAudioHandler) {
+  await (audioHandler as MyAudioHandler).setVolume(_baseVolume);
+}
+if (audioHandler is MyAudioHandler) {
+  await (audioHandler as MyAudioHandler).setVolume(newVolume);
   }
 
   Future<void> _resetEqualizer() async {
@@ -1629,7 +1632,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               setModalState(() => _volume = value);
                               setState(() => _volume = value);
                               _baseVolume = value;
-                              await audioHandler.setVolume(value);
+                              if (audioHandler is MyAudioHandler) {
+  await (audioHandler as MyAudioHandler).setVolume(value);
+                              }
                               _saveData();
                             },
                           ),
@@ -1874,9 +1879,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   onTap: () async {
                     setState(() => is3DMode = !is3DMode);
                     if (is3DMode) {
-                      await audioHandler.setVolume(0.9);
-                    } else {
-                      await audioHandler.setVolume(_volume);
+                      if (audioHandler is MyAudioHandler) {
+  await (audioHandler as MyAudioHandler).setVolume(0.9);
+}
+if (audioHandler is MyAudioHandler) {
+  await (audioHandler as MyAudioHandler).setVolume(_volume);
                     }
                     _saveData();
                   },
