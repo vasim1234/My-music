@@ -4,12 +4,12 @@ import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter/material.dart';
 
-// Global instance
-late final AudioHandler audioHandler;
+// ===== FIX: Nullable audioHandler =====
+AudioHandler? audioHandler;
 
 Future<AudioHandler> initAudioService() async {
   print('🔊 initAudioService called');
-  return await AudioService.init(
+  final handler = await AudioService.init(
     builder: () => MyAudioHandler(),
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.music.app.my_music.channel',
@@ -19,6 +19,9 @@ Future<AudioHandler> initAudioService() async {
       androidNotificationIcon: 'mipmap/ic_launcher',
     ),
   );
+  audioHandler = handler;
+  print('✅ audioHandler initialized');
+  return handler;
 }
 
 class MyAudioHandler extends BaseAudioHandler {
@@ -33,17 +36,6 @@ class MyAudioHandler extends BaseAudioHandler {
     
     _player.playerStateStream.listen((state) {
       _isPlaying = state.playing;
-      print('🎵 Player state: playing=${state.playing}');
-    });
-    
-    // ===== LISTEN TO DURATION =====
-    _player.durationStream.listen((duration) {
-      print('⏱️ Duration: $duration');
-    });
-    
-    // ===== LISTEN TO POSITION =====
-    _player.positionStream.listen((position) {
-      // print('📍 Position: $position');  // Commented to avoid spam
     });
   }
 
@@ -52,35 +44,22 @@ class MyAudioHandler extends BaseAudioHandler {
     await _player.setVolume(_currentVolume);
   }
 
-  // ===== PLAY SONG =====
   Future<void> playSong(String path, String title, String artist) async {
     print('🎵 playSong called: $title');
-    print('📁 Path: $path');
     
     try {
-      // Check if file exists
       final file = File(path);
       if (!file.existsSync()) {
         print('❌ File does NOT exist: $path');
         return;
       }
-      print('✅ File exists');
-      print('📁 File size: ${file.lengthSync()} bytes');
       
-      // Stop current song if playing
       await _player.stop();
-      print('⏹️ Stopped previous song');
       
-      // ===== FIX: Use Uri.file =====
       final uri = Uri.file(path);
-      print('📁 URI: $uri');
-      
-      // Set audio source
       await _player.setAudioSource(AudioSource.uri(uri));
       _currentSongPath = path;
-      print('📁 Audio source set');
       
-      // Update notification
       mediaItem.add(
         MediaItem(
           id: path,
@@ -90,44 +69,31 @@ class MyAudioHandler extends BaseAudioHandler {
           duration: _player.duration,
         ),
       );
-      print('📱 Notification updated');
       
-      // Apply volume
       await _player.setVolume(_currentVolume);
-      
-      // ===== PLAY =====
       await _player.play();
       _isPlaying = true;
       print('▶️ Playing started');
       
     } catch (e) {
       print('❌ Play song error: $e');
-      print('❌ Stack trace: ${StackTrace.current}');
     }
   }
 
   @override
   Future<void> play() async {
-    print('▶️ play() called');
-    if (_player.playing) {
-      print('⚠️ Already playing');
-      return;
-    }
     await _player.play();
     _isPlaying = true;
-    print('▶️ Play resumed');
   }
 
   @override
   Future<void> pause() async {
-    print('⏸️ pause() called');
     await _player.pause();
     _isPlaying = false;
   }
 
   @override
   Future<void> stop() async {
-    print('⏹️ stop() called');
     await _player.stop();
     _isPlaying = false;
     await super.stop();
