@@ -63,5 +63,7 @@ flutter {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.0')
+implementation 'org.jetbrains.kotlin:kotlin-stdlib'
+
 }
