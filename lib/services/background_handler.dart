@@ -45,10 +45,10 @@ class MyAudioHandler extends BaseAudioHandler {
 
   Future<void> playSong(String path, String title, String artist) async {
     try {
+      await _player.stop(); // <-- Yahan line 47 par daalna hai
       final file = File(path);
-      if (!await file.exists()) throw Exception('File not found: $path');
-      
-      await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
+       if (!await file.exists()) throw Exception('File not found: $path');
+       await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       await _player.play();
       
       mediaItem.add(MediaItem(
