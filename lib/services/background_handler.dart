@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:rxdart/rxdart.dart';
 
 AudioHandler? audioHandler;
 
@@ -35,19 +34,10 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // 🔥 POSITION STREAM - Broadcast position updates properly
+    // 🔥 POSITION STREAM
     _player.positionStream.listen((position) {
       print('📍 [Native] Position: $position');
-      // 🔥 CRITICAL: playbackState update with playing state only
-      // Position automatically broadcast hoti hai through positionStream
-      final currentState = playbackState.value;
-      playbackState.add(
-        currentState.copyWith(
-          playing: _player.playing,
-          bufferedPosition: _player.bufferedPosition,
-          speed: _player.speed,
-        ),
-      );
+      // Position update for UI
     });
 
     // 🔥 PLAYER STATE STREAM
@@ -56,7 +46,6 @@ class MyAudioHandler extends BaseAudioHandler {
       final isPlaying = state.playing;
       final processingState = _getAudioProcessingState(state.processingState);
       
-      // 🔥 CRITICAL: Update playbackState without position parameter
       playbackState.add(
         playbackState.value.copyWith(
           playing: isPlaying,
@@ -76,7 +65,6 @@ class MyAudioHandler extends BaseAudioHandler {
         _isPlayerReady = true;
       }
       
-      // 🔥 CRITICAL: Jab loading complete ho jaye toh duration update karo
       if (state.processingState == ProcessingState.ready) {
         final duration = _player.duration;
         if (duration != null && duration > Duration.zero) {
@@ -172,7 +160,6 @@ class MyAudioHandler extends BaseAudioHandler {
       _currentSongPath = path;
       _isPlayerReady = true;
       
-      // 🔥 UPDATE PLAYBACK STATE - WITHOUT position parameter!
       playbackState.add(
         playbackState.value.copyWith(
           playing: true,
@@ -183,7 +170,6 @@ class MyAudioHandler extends BaseAudioHandler {
       );
       
       print('✅ Song playing successfully: $title');
-      print('✅ Duration: $duration');
       
     } catch (e, stacktrace) {
       print('❌ Error in playSong: $e');
@@ -198,20 +184,6 @@ class MyAudioHandler extends BaseAudioHandler {
       return Uri.file(artFile.path);
     }
     return Uri.parse('asset:///assets/icon/icon.png');
-  }
-
-  // 🔥 RESET PLAYER
-  Future<void> resetPlayer() async {
-    print('🔄 Resetting player...');
-    await _player.stop();
-    _isPlayerReady = false;
-    _currentSongPath = null;
-    playbackState.add(
-      playbackState.value.copyWith(
-        playing: false,
-        processingState: AudioProcessingState.idle,
-      ),
-    );
   }
 
   // 🔥 OVERRIDE METHODS
@@ -254,14 +226,6 @@ class MyAudioHandler extends BaseAudioHandler {
     if (_isPlayerReady) {
       print('⏩ Seeking to: $p');
       await _player.seek(p);
-      // 🔥 Seek ke baad position update
-      playbackState.add(
-        playbackState.value.copyWith(
-          playing: _player.playing,
-          bufferedPosition: _player.bufferedPosition,
-          speed: _player.speed,
-        ),
-      );
     }
   }
   
@@ -317,28 +281,25 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 }
 
-// 🔥 INIT AUDIO SERVICE
+// 🔥 INIT AUDIO SERVICE - WITH ERROR HANDLING
 Future<AudioHandler> initAudioService() async {
-  if (audioHandler != null) {
-    print('✅ Audio handler already exists');
-    return audioHandler!;
+  try {
+    print('🔊 initAudioService called');
+    
+    if (audioHandler != null) {
+      print('✅ Audio handler already exists');
+      return audioHandler!;
+    }
+    
+    print('🔄 Creating new AudioHandler');
+    final handler = MyAudioHandler();
+    audioHandler = handler;
+    print('✅ AudioHandler created successfully');
+    
+    return handler;
+  } catch (e, stacktrace) {
+    print('❌ Error initializing audio service: $e');
+    print('📚 Stacktrace: $stacktrace');
+    rethrow;
   }
-  
-  print('🔊 Initializing audio service with notification...');
-  
-  audioHandler = await AudioService.init(
-    builder: () => MyAudioHandler(),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.music.app.my_music.channel',
-      androidNotificationChannelName: 'My Music Player',
-      androidNotificationIcon: 'drawable/ic_notification',
-      androidShowNotificationBadge: true,
-      androidStopForegroundOnPause: true,
-      androidNotificationOngoing: false,
-      androidNotificationClickStartsActivity: true,
-    ),
-  );
-  
-  print('✅ Audio service initialized');
-  return audioHandler!;
 }
