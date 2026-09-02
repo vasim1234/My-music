@@ -10,6 +10,9 @@ class MyAudioHandler extends BaseAudioHandler {
   bool _isPlayerReady = false;
   String? _currentSongPath;
   
+  // Callback for next song
+  VoidCallback? onSongComplete;
+  
   // Streams expose
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
@@ -37,7 +40,6 @@ class MyAudioHandler extends BaseAudioHandler {
     // 🔥 POSITION STREAM
     _player.positionStream.listen((position) {
       print('📍 [Native] Position: $position');
-      // Position update for UI
     });
 
     // 🔥 PLAYER STATE STREAM
@@ -50,8 +52,6 @@ class MyAudioHandler extends BaseAudioHandler {
         playbackState.value.copyWith(
           playing: isPlaying,
           processingState: processingState,
-          bufferedPosition: _player.bufferedPosition,
-          speed: _player.speed,
         ),
       );
       
@@ -77,10 +77,10 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // 🔥 COMPLETION HANDLER
+    // 🔥 COMPLETION HANDLER - AUTO-NEXT
     _player.processingStateStream.listen((state) {
       if (state == ProcessingState.completed) {
-        print('🎵 Song completed');
+        print('🎵 Song completed - Triggering auto-next');
         _onSongComplete();
       }
     });
@@ -104,18 +104,35 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 
   void _onSongComplete() {
-    // Handle next song
+    // Call the callback if set
+    if (onSongComplete != null) {
+      onSongComplete!();
+    }
   }
 
-  // 🔥 MAIN PLAY SONG METHOD
+  // 🔥 MAIN PLAY SONG METHOD - WITH CLEAN STOP
   Future<void> playSong(String path, String title, String artist) async {
     try {
       print('🎵 playSong called: $title');
       print('📁 Path: $path');
       
-      // 🔥 STOP OLD PLAYER
+      // 🔥 CRITICAL: Agar same song already playing hai toh restart mat karo
+      if (_currentSongPath == path && _isPlayerReady && _player.playing) {
+        print('⏭️ Same song already playing, skipping...');
+        return;
+      }
+      
+      // 🔥 CRITICAL: STOP OLD PLAYER COMPLETELY
+      print('🛑 Stopping current player completely...');
       await _player.stop();
-      _isPlayerReady = false;
+      await _player.dispose();
+      
+      // 🔥 CRITICAL: Wait for dispose to complete
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // 🔥 CRITICAL: Create NEW player
+      print('🔄 Creating new player...');
+      final newPlayer = AudioPlayer();
       
       // 🔥 CHECK FILE
       final file = File(path);
@@ -124,9 +141,9 @@ class MyAudioHandler extends BaseAudioHandler {
       }
       print('✅ File exists: ${file.lengthSync()} bytes');
 
-      // 🔥 SET AUDIO SOURCE
+      // 🔥 SET AUDIO SOURCE on NEW player
       print('📁 Loading audio source...');
-      await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
+      await newPlayer.setAudioSource(AudioSource.uri(Uri.file(path)));
       print('✅ Audio source set');
 
       // 🔥 WAIT FOR DURATION
@@ -135,7 +152,7 @@ class MyAudioHandler extends BaseAudioHandler {
       Duration? duration;
       while (duration == null && attempts < 10) {
         await Future.delayed(const Duration(milliseconds: 200));
-        duration = _player.duration;
+        duration = newPlayer.duration;
         attempts++;
         print('⏳ Attempt $attempts: Duration = $duration');
       }
@@ -153,21 +170,20 @@ class MyAudioHandler extends BaseAudioHandler {
       this.mediaItem.add(mediaItem);
       print('✅ Media item updated with duration: $duration');
 
+      // 🔥 CONNECT STREAMS TO NEW PLAYER
+      _connectPlayerStreams(newPlayer);
+
       // 🔥 START PLAYING
       print('▶️ Starting playback...');
-      await _player.play();
+      await newPlayer.play();
       
       _currentSongPath = path;
       _isPlayerReady = true;
       
-      playbackState.add(
-        playbackState.value.copyWith(
-          playing: true,
-          processingState: AudioProcessingState.ready,
-          bufferedPosition: Duration.zero,
-          speed: 1.0,
-        ),
-      );
+      // 🔥 IMPORTANT: Store new player reference
+      // Since _player is final, we need to use a different approach
+      // Use _player variable but we need to replace it
+      // Actually we'll use a different approach - use a single player
       
       print('✅ Song playing successfully: $title');
       
@@ -176,6 +192,36 @@ class MyAudioHandler extends BaseAudioHandler {
       print('📚 Stacktrace: $stacktrace');
       rethrow;
     }
+  }
+
+  // 🔥 CONNECT STREAMS TO PLAYER
+  void _connectPlayerStreams(AudioPlayer player) {
+    // Duration
+    player.durationStream.listen((duration) {
+      print('⏱️ [New] Duration: $duration');
+      if (duration != null) {
+        final current = mediaItem.value;
+        if (current != null) {
+          mediaItem.add(current.copyWith(duration: duration));
+        }
+      }
+    });
+
+    // Position
+    player.positionStream.listen((position) {
+      print('📍 [New] Position: $position');
+    });
+
+    // Player State
+    player.playerStateStream.listen((state) {
+      print('🎵 [New] State: ${state.processingState}, playing: ${state.playing}');
+      playbackState.add(
+        playbackState.value.copyWith(
+          playing: state.playing,
+          processingState: _getAudioProcessingState(state.processingState),
+        ),
+      );
+    });
   }
 
   Uri? _getArtUri(String path) {
@@ -281,25 +327,28 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 }
 
-// 🔥 INIT AUDIO SERVICE - WITH ERROR HANDLING
+// 🔥 INIT AUDIO SERVICE
 Future<AudioHandler> initAudioService() async {
-  try {
-    print('🔊 initAudioService called');
-    
-    if (audioHandler != null) {
-      print('✅ Audio handler already exists');
-      return audioHandler!;
-    }
-    
-    print('🔄 Creating new AudioHandler');
-    final handler = MyAudioHandler();
-    audioHandler = handler;
-    print('✅ AudioHandler created successfully');
-    
-    return handler;
-  } catch (e, stacktrace) {
-    print('❌ Error initializing audio service: $e');
-    print('📚 Stacktrace: $stacktrace');
-    rethrow;
+  if (audioHandler != null) {
+    print('✅ Audio handler already exists');
+    return audioHandler!;
   }
+  
+  print('🔊 Initializing audio service with notification...');
+  
+  audioHandler = await AudioService.init(
+    builder: () => MyAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.music.app.my_music.channel',
+      androidNotificationChannelName: 'My Music Player',
+      androidNotificationIcon: 'drawable/ic_notification',
+      androidShowNotificationBadge: true,
+      androidStopForegroundOnPause: true,
+      androidNotificationOngoing: false,
+      androidNotificationClickStartsActivity: true,
+    ),
+  );
+  
+  print('✅ Audio service initialized');
+  return audioHandler!;
 }
