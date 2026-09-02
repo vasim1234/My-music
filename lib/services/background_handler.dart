@@ -132,7 +132,6 @@ Future<AudioHandler> initAudioService() async {
       androidNotificationChannelName: 'My Music Player',
       androidNotificationIcon: 'drawable/ic_notification',
       androidShowNotificationBadge: true,
-      androidEnableQueue: true,
       androidStopForegroundOnPause: false,
       androidNotificationOngoing: true,
       androidNotificationClickStartsActivity: true,
