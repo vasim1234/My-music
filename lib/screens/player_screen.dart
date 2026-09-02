@@ -117,161 +117,339 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // LIFECYCLE METHODS
-  // ============================================================
-  @override
-  void initState() {
-    super.initState();
-    
-    // 🔥 Observer register karo
-    WidgetsBinding.instance.addObserver(this);
-    
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-    
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    _loadSavedData();
-    _initAudioService();
-    _listenToAudioStreams();
-    
-    Future.delayed(const Duration(milliseconds: 800), () {
-      print('🔊 Audio service ready check');
-      if (audioHandler is MyAudioHandler) {
-        print('✅ Audio handler is ready');
-      } else {
-        print('⚠️ Audio handler not ready yet');
-      }
-    });
+// 🔥 APP LIFECYCLE HANDLING
+// ============================================================
+@override
+void didChangeAppLifecycleState(AppLifecycleState state) {
+  super.didChangeAppLifecycleState(state);
+  
+  print('📱 App lifecycle changed: $state');
+  
+  if (state == AppLifecycleState.resumed) {
+    // 🔥 APP WAPAS AAYI - STATE SYNC KARO
+    _syncPlayerState();
   }
-
-  @override
-  void dispose() {
-    // 🔥 Observer remove karo
-    WidgetsBinding.instance.removeObserver(this);
-    
+  
+  if (state == AppLifecycleState.paused) {
+    // 🔥 APP BACKGROUND MEIN GAYI
+    print('📱 App went to background');
     _saveData();
-    _pulseController.dispose();
-    _sleepTimer?.cancel();
-    super.dispose();
   }
-
-  // ============================================================
-  // 🔥 APP LIFECYCLE HANDLING
-  // ============================================================
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    
-    print('📱 App lifecycle changed: $state');
-    
-    if (state == AppLifecycleState.resumed) {
-      // 🔥 APP WAPAS AAYI - STATE SYNC KARO
-      _syncPlayerState();
-    }
-    
-    if (state == AppLifecycleState.paused) {
-      // 🔥 APP BACKGROUND MEIN GAYI
-      print('📱 App went to background');
-      _saveData();
-    }
-    
-    if (state == AppLifecycleState.detached) {
-      print('📱 App detached');
-    }
+  
+  if (state == AppLifecycleState.detached) {
+    print('📱 App detached');
   }
+}
 
-  // 🔥 PLAYER STATE SYNC
-  Future<void> _syncPlayerState() async {
-    print('🔄 Syncing player state...');
+// 🔥 PLAYER STATE SYNC
+Future<void> _syncPlayerState() async {
+  print('🔄 Syncing player state...');
+  
+  if (audioHandler is MyAudioHandler) {
+    final handler = audioHandler as MyAudioHandler;
     
+    try {
+      final isPlaying = handler.isPlaying;
+      final isReady = handler.isReady;
+      final currentSong = handler.currentSong;
+      
+      setState(() {
+        this.isPlaying = isPlaying;
+        if (isReady && currentSong != null) {
+          print('✅ Player ready: $currentSong, playing: $isPlaying');
+        } else {
+          print('⚠️ Player not ready or no song');
+        }
+      });
+      
+      print('✅ State synced: playing=$isPlaying, ready=$isReady');
+    } catch (e) {
+      print('❌ Error syncing player state: $e');
+    }
+  } else {
+    print('⚠️ audioHandler is not MyAudioHandler');
+  }
+}
+
+// ============================================================
+// AUDIO SERVICE INITIALIZATION
+// ============================================================
+Future<void> _initAudioService() async {
+  try {
+    print('🔊 Initializing audio service...');
+    audioHandler = await initAudioService();
+    print('✅ Audio service initialized successfully');
+    print('🔍 audioHandler type: ${audioHandler.runtimeType}');
+  } catch (e) {
+    print('❌ Audio service error: $e');
+  }
+}
+
+// ============================================================
+// LISTEN TO AUDIO STREAMS - 🔥 FIXED WITH PRINT LOGS
+// ============================================================
+void _listenToAudioStreams() {
+  Future.delayed(const Duration(milliseconds: 500), () {
     if (audioHandler is MyAudioHandler) {
       final handler = audioHandler as MyAudioHandler;
       
-      try {
-        final isPlaying = handler.isPlaying;
-        final isReady = handler.isReady;
-        final currentSong = handler.currentSong;
-        
-        setState(() {
-          this.isPlaying = isPlaying;
-          if (isReady && currentSong != null) {
-            print('✅ Player ready: $currentSong, playing: $isPlaying');
-          } else {
-            print('⚠️ Player not ready or no song');
-          }
-        });
-        
-        print('✅ State synced: playing=$isPlaying, ready=$isReady');
-      } catch (e) {
-        print('❌ Error syncing player state: $e');
-      }
+      // 🔥 DURATION - with print
+      handler.durationStream.listen((duration) {
+        if (mounted && duration != null) {
+          setState(() {
+            _duration = duration;
+          });
+          print('⏱️ UI Duration: $duration');
+        }
+      });
+      
+      // 🔥 POSITION - with print
+      handler.positionStream.listen((position) {
+        if (mounted) {
+          setState(() {
+            _position = position;
+          });
+          print('📍 UI Position: $position');
+        }
+      });
+      
+      // 🔥 PLAYBACK STATE - with print
+      handler.playbackState.listen((state) {
+        if (mounted) {
+          setState(() {
+            isPlaying = state.playing;
+          });
+          print('🎵 UI Playing: ${state.playing}');
+        }
+      });
+      
+      print('✅ Audio streams connected');
     } else {
-      print('⚠️ audioHandler is not MyAudioHandler');
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _listenToAudioStreams();
+      });
     }
-  }
-
-  // ============================================================
-  // AUDIO SERVICE INITIALIZATION
-  // ============================================================
-  Future<void> _initAudioService() async {
-    try {
-      print('🔊 Initializing audio service...');
-      audioHandler = await initAudioService();
-      print('✅ Audio service initialized successfully');
-      print('🔍 audioHandler type: ${audioHandler.runtimeType}');
-    } catch (e) {
-      print('❌ Audio service error: $e');
+  });
+}
+ 
+// ============================================================
+// EQUALIZER FUNCTIONS
+// ============================================================
+Future<void> _applyEqualizer() async {
+  if (!_isEqActive) {
+    if (audioHandler is MyAudioHandler) {
+      await (audioHandler as MyAudioHandler).setVolume(_baseVolume);
     }
+    return;
   }
+  
+  double bass = _currentEqValues[0];
+  double mid = _currentEqValues[1];
+  double treble = _currentEqValues[2];
+  
+  double volumeEffect = 1.0 + (bass + mid + treble) * 0.015;
+  double newVolume = (_baseVolume * volumeEffect).clamp(0.0, 1.0);
+  
+  if (audioHandler is MyAudioHandler) {
+    await (audioHandler as MyAudioHandler).setVolume(newVolume);
+  }
+}
 
-  // ============================================================
-  // LISTEN TO AUDIO STREAMS
-  // ============================================================
-  void _listenToAudioStreams() {
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (audioHandler is MyAudioHandler) {
-        final handler = audioHandler as MyAudioHandler;
-        
-        // Duration
-        handler.durationStream.listen((duration) {
-          if (mounted && duration != null) {
-            setState(() {
-              _duration = duration;
-            });
-          }
-        });
-        
-        // Position
-        handler.positionStream.listen((position) {
-          if (mounted) {
-            setState(() {
-              _position = position;
-            });
-          }
-        });
-        
-        // Playback State
-        handler.playbackState.listen((state) {
-          if (mounted) {
-            setState(() {
-              isPlaying = state.playing;
-            });
-          }
-        });
-        
-        print('✅ Audio streams connected');
-      } else {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _listenToAudioStreams();
-        });
-      }
-    });
-  }
+Future<void> _resetEqualizer() async {
+  setState(() {
+    _currentEqPreset = 'Normal';
+    _currentEqValues = [0, 0, 0];
+    _isEqActive = false;
+  });
+  await _applyEqualizer();
+  _saveData();
+}
+
+Future<void> _applyPreset(String presetName) async {
+  setState(() {
+    _currentEqPreset = presetName;
+    _currentEqValues = List.from(_eqPresets[presetName]!);
+    _isEqActive = presetName != 'Normal';
+  });
+  await _applyEqualizer();
+  _saveData();
+}
+
+void _showEqualizerDialog() {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: _bgColor,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    isScrollControlled: true,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: _primaryGradient),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.equalizer, color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text('Equalizer', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        if (_isEqActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text('ON', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+                          onPressed: () { _resetEqualizer(); setModalState(() {}); },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white70),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const Divider(color: Colors.white24),
+                const Text('PRESETS', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _eqPresets.keys.map((preset) {
+                    bool isSelected = _currentEqPreset == preset;
+                    return FilterChip(
+                      label: Text(preset, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 11)),
+                      selected: isSelected,
+                      selectedColor: _accentColor.withOpacity(0.3),
+                      backgroundColor: _cardColor,
+                      side: BorderSide(color: isSelected ? _accentColor : Colors.grey.shade700, width: 1.5),
+                      onSelected: (selected) {
+                        if (selected) { _applyPreset(preset); setModalState(() {}); }
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: Colors.white24),
+                const Text('3 BAND EQUALIZER', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: 3,
+                    itemBuilder: (context, index) {
+                      return _buildEqSlider(
+                        label: _bandLabels[index],
+                        index: index,
+                        value: _currentEqValues[index],
+                        onChanged: (value) {
+                          setState(() {
+                            _currentEqValues[index] = value;
+                            _currentEqPreset = 'Custom';
+                            _isEqActive = true;
+                          });
+                          setModalState(() {});
+                          _applyEqualizer();
+                          _saveData();
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Enable Equalizer', style: TextStyle(color: Colors.white, fontSize: 14)),
+                    Switch(
+                      value: _isEqActive,
+                      activeColor: _accentColor,
+                      activeTrackColor: _accentColor.withOpacity(0.3),
+                      onChanged: (value) async {
+                        setState(() {
+                          _isEqActive = value;
+                          if (!value) {
+                            _currentEqValues = [0, 0, 0];
+                            _currentEqPreset = 'Normal';
+                          }
+                        });
+                        await _applyEqualizer();
+                        _saveData();
+                        setModalState(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+Widget _buildEqSlider({
+  required String label,
+  required int index,
+  required double value,
+  required Function(double) onChanged,
+}) {
+  List<Color> colors = [Colors.red, Colors.green, Colors.blue];
+  Color color = colors[index % colors.length];
+  
+  return Column(
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [color, color.withOpacity(0.6)]),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              value > 0 ? '+${value.toInt()}' : '${value.toInt()}',
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+      Slider(
+        value: value,
+        min: -10,
+        max: 10,
+        activeColor: color,
+        inactiveColor: Colors.grey.shade800,
+        onChanged: onChanged,
+      ),
+    ],
+  );
+}
    
   // ============================================================
   // EQUALIZER FUNCTIONS
