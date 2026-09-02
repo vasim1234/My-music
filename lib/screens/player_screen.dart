@@ -242,47 +242,47 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // LISTEN TO AUDIO STREAMS - 🔥 FIXED WITH PRINT LOGS
   // ============================================================
   void _listenToAudioStreams() {
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (audioHandler is MyAudioHandler) {
-        final handler = audioHandler as MyAudioHandler;
-        
-        // 🔥 DURATION - with print
-        handler.durationStream.listen((duration) {
-          if (mounted && duration != null) {
-            setState(() {
-              _duration = duration;
-            });
-            print('⏱️ UI Duration: $duration');
-          }
-        });
-        
-        // 🔥 POSITION - with print
-        handler.positionStream.listen((position) {
-          if (mounted) {
-            setState(() {
-              _position = position;
-            });
-            print('📍 UI Position: $position');
-          }
-        });
-        
-        // 🔥 PLAYBACK STATE - with print
-        handler.playbackState.listen((state) {
-          if (mounted) {
-            setState(() {
-              isPlaying = state.playing;
-            });
-            print('🎵 UI Playing: ${state.playing}');
-          }
-        });
-        
-        print('✅ Audio streams connected');
-      } else {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _listenToAudioStreams();
-        });
-      }
-    });
+  Future.delayed(const Duration(milliseconds: 500), () {
+    if (audioHandler is MyAudioHandler) {
+      final handler = audioHandler as MyAudioHandler;
+      
+      // 🔥 DURATION
+      handler.durationStream.listen((duration) {
+        if (mounted && duration != null) {
+          setState(() {
+            _duration = duration;
+          });
+          print('⏱️ [UI] Duration: $duration');
+        }
+      });
+      
+      // 🔥 POSITION - Yeh stream se position milegi
+      handler.positionStream.listen((position) {
+        if (mounted) {
+          setState(() {
+            _position = position;
+          });
+          print('📍 [UI] Position: $position');
+        }
+      });
+      
+      // 🔥 PLAYBACK STATE
+      handler.playbackState.listen((state) {
+        if (mounted) {
+          setState(() {
+            isPlaying = state.playing;
+          });
+          print('🎵 [UI] Playing: ${state.playing}');
+        }
+      });
+      
+      print('✅ Audio streams connected');
+    } else {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _listenToAudioStreams();
+      });
+    }
+  });
   }
    
   // ============================================================
