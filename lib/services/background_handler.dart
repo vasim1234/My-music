@@ -34,17 +34,14 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // 🔥 POSITION STREAM - IMPORTANT: Har position update par playbackState update karo
+    // 🔥 POSITION STREAM - NO position parameter!
     _player.positionStream.listen((position) {
       print('📍 [Native] Position: $position');
-      // 🔥 CRITICAL: playbackState update karo taaki UI update ho
+      // 🔥 POSITION KO COPYWITH MEIN MAT DALO - audio_service apne aap handle karega
       final currentState = playbackState.value;
       playbackState.add(
         currentState.copyWith(
-          position: position,
           playing: _player.playing,
-          bufferedPosition: _player.bufferedPosition,
-          speed: _player.speed,
         ),
       );
     });
@@ -55,14 +52,11 @@ class MyAudioHandler extends BaseAudioHandler {
       final isPlaying = state.playing;
       final processingState = _getAudioProcessingState(state.processingState);
       
-      // 🔥 CRITICAL: playbackState update with all info
+      // 🔥 CRITICAL: position parameter MAT DALO
       playbackState.add(
         playbackState.value.copyWith(
           playing: isPlaying,
           processingState: processingState,
-          position: _player.position,
-          bufferedPosition: _player.bufferedPosition,
-          speed: _player.speed,
         ),
       );
       
@@ -85,14 +79,6 @@ class MyAudioHandler extends BaseAudioHandler {
           if (current != null) {
             mediaItem.add(current.copyWith(duration: duration));
           }
-          // 🔥 playbackState mein bhi update karo
-          playbackState.add(
-            playbackState.value.copyWith(
-              position: Duration.zero,
-              playing: true,
-              processingState: AudioProcessingState.ready,
-            ),
-          );
         }
       }
     });
@@ -149,7 +135,7 @@ class MyAudioHandler extends BaseAudioHandler {
       await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       print('✅ Audio source set');
 
-      // 🔥 WAIT FOR DURATION - CRITICAL FIX!
+      // 🔥 WAIT FOR DURATION
       print('⏳ Waiting for duration...');
       int attempts = 0;
       Duration? duration;
@@ -180,20 +166,16 @@ class MyAudioHandler extends BaseAudioHandler {
       _currentSongPath = path;
       _isPlayerReady = true;
       
-      // 🔥 UPDATE PLAYBACK STATE WITH POSITION
+      // 🔥 UPDATE PLAYBACK STATE - WITHOUT position parameter!
       playbackState.add(
         playbackState.value.copyWith(
           playing: true,
           processingState: AudioProcessingState.ready,
-          position: Duration.zero,
-          bufferedPosition: Duration.zero,
-          speed: 1.0,
         ),
       );
       
       print('✅ Song playing successfully: $title');
       print('✅ Duration: $duration');
-      print('✅ Position: ${_player.position}');
       
     } catch (e, stacktrace) {
       print('❌ Error in playSong: $e');
@@ -208,6 +190,20 @@ class MyAudioHandler extends BaseAudioHandler {
       return Uri.file(artFile.path);
     }
     return Uri.parse('asset:///assets/icon/icon.png');
+  }
+
+  // 🔥 RESET PLAYER
+  Future<void> resetPlayer() async {
+    print('🔄 Resetting player...');
+    await _player.stop();
+    _isPlayerReady = false;
+    _currentSongPath = null;
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: false,
+        processingState: AudioProcessingState.idle,
+      ),
+    );
   }
 
   // 🔥 OVERRIDE METHODS
@@ -239,7 +235,6 @@ class MyAudioHandler extends BaseAudioHandler {
       playbackState.value.copyWith(
         playing: false,
         processingState: AudioProcessingState.idle,
-        position: Duration.zero,
       ),
     );
     await AudioService.stop();
