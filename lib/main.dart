@@ -2,10 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:my_music/services/background_handler.dart';
 import 'screens/player_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Yahan 'await' hata diya hai taaki app white screen par hang na ho
-  initAudioService();
+  
+  try {
+    print('🚀 Starting app...');
+    // 🔥 IMPORTANT: Await karo initialization
+    await initAudioService();
+    print('✅ Audio service initialized successfully');
+  } catch (e, stacktrace) {
+    print('❌ Failed to initialize audio service: $e');
+    print('📚 Stacktrace: $stacktrace');
+  }
 
   runApp(const MyMusicApp());
 }
@@ -20,7 +28,7 @@ class MyMusicApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0A0A0F), // 🔥 FIX: Dark background
+        scaffoldBackgroundColor: const Color(0xFF0A0A0F),
         primaryColor: const Color(0xFF6C63FF),
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF6C63FF),
