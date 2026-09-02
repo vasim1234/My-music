@@ -34,16 +34,14 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // 🔥 POSITION STREAM - FIX: position parameter sahi se
+    // 🔥 POSITION STREAM
     _player.positionStream.listen((position) {
-      // 🔥 FIX: copyWith mein position parameter nahi hai, isliye alag se update
       final currentState = playbackState.value;
       playbackState.add(
         currentState.copyWith(
           playing: _player.playing,
         ),
       );
-      // Position ko alag se update karne ki zaroorat nahi, audio_service apne aap handle karega
     });
 
     // 🔥 PLAYER STATE STREAM
@@ -101,7 +99,7 @@ class MyAudioHandler extends BaseAudioHandler {
     // Handle next song
   }
 
-  // 🔥 MAIN PLAY SONG METHOD
+  // 🔥 MAIN PLAY SONG METHOD (FIXED)
   Future<void> playSong(String path, String title, String artist) async {
     try {
       print('🎵 playSong called: $title');
@@ -114,14 +112,9 @@ class MyAudioHandler extends BaseAudioHandler {
         return;
       }
 
-      // 🔥 STOP OLD PLAYER
+      // 🔥 STOP OLD PLAYER (Dispose nahi karna hai!)
       print('🛑 Stopping current player...');
       await _player.stop();
-      await _player.dispose();
-      
-      // 🔥 CREATE NEW PLAYER
-      print('🔄 Creating new player...');
-      final newPlayer = AudioPlayer();
       
       // 🔥 CHECK FILE
       final file = File(path);
@@ -130,20 +123,17 @@ class MyAudioHandler extends BaseAudioHandler {
       }
       print('✅ File exists: ${file.lengthSync()} bytes');
 
-      // 🔥 SET AUDIO SOURCE
+      // 🔥 SET AUDIO SOURCE (_player ka hi use karein)
       print('📁 Loading audio source...');
-      await newPlayer.setAudioSource(AudioSource.uri(Uri.file(path)));
+      await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       print('✅ Audio source set');
-
-      // 🔥 CONNECT STREAMS
-      _connectPlayerStreams(newPlayer);
 
       // 🔥 UPDATE MEDIA ITEM
       final mediaItem = MediaItem(
         id: path,
         title: title,
         artist: artist,
-        duration: newPlayer.duration,
+        duration: _player.duration,
         artUri: _getArtUri(path),
       );
       this.mediaItem.add(mediaItem);
@@ -151,7 +141,7 @@ class MyAudioHandler extends BaseAudioHandler {
 
       // 🔥 START PLAYING
       print('▶️ Starting playback...');
-      await newPlayer.play();
+      await _player.play();
       
       _currentSongPath = path;
       _isPlayerReady = true;
@@ -170,38 +160,6 @@ class MyAudioHandler extends BaseAudioHandler {
       print('📚 Stacktrace: $stacktrace');
       rethrow;
     }
-  }
-
-  // 🔥 CONNECT PLAYER STREAMS
-  void _connectPlayerStreams(AudioPlayer player) {
-    // Duration
-    player.durationStream.listen((duration) {
-      if (duration != null) {
-        final current = mediaItem.value;
-        if (current != null) {
-          mediaItem.add(current.copyWith(duration: duration));
-        }
-      }
-    });
-
-    // Position
-    player.positionStream.listen((position) {
-      playbackState.add(
-        playbackState.value.copyWith(
-          playing: player.playing,
-        ),
-      );
-    });
-
-    // Player State
-    player.playerStateStream.listen((state) {
-      playbackState.add(
-        playbackState.value.copyWith(
-          playing: state.playing,
-          processingState: _getAudioProcessingState(state.processingState),
-        ),
-      );
-    });
   }
 
   // 🔥 ARTWORK
@@ -353,7 +311,7 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 }
 
-// 🔥 INIT AUDIO SERVICE - FIX: androidEnableQueue parameter hatao
+// 🔥 INIT AUDIO SERVICE (FIXED)
 Future<AudioHandler> initAudioService() async {
   if (audioHandler != null) {
     print('✅ Audio handler already exists');
@@ -369,10 +327,9 @@ Future<AudioHandler> initAudioService() async {
       androidNotificationChannelName: 'My Music Player',
       androidNotificationIcon: 'drawable/ic_notification',
       androidShowNotificationBadge: true,
-      // 🔥 FIX: androidEnableQueue parameter hatao - is version mein nahi hai
-      androidStopForegroundOnPause: false,
-      androidNotificationOngoing: true,
-      androidNotificationClickStartsActivity: true,  
+      androidStopForegroundOnPause: true,
+      androidNotificationOngoing: false,
+      androidNotificationClickStartsActivity: true,
     ),
   );
   
