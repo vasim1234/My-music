@@ -8,7 +8,7 @@ AudioHandler? audioHandler;
 class MyAudioHandler extends BaseAudioHandler {
   final AudioPlayer _player = AudioPlayer();
   
-  // Streams expose karo
+  // Streams expose karo taaki UI par timer aur progress bar chale
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
   
@@ -17,7 +17,7 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 
   void _init() {
-    // Duration
+    // Duration update listener
     _player.durationStream.listen((duration) {
       if (duration != null) {
         final current = mediaItem.value;
@@ -27,7 +27,7 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // Position
+    // Position aur Play State listener
     _player.positionStream.listen((position) {
       playbackState.add(playbackState.value.copyWith(
         playing: _player.playing,
@@ -35,7 +35,7 @@ class MyAudioHandler extends BaseAudioHandler {
       ));
     });
 
-    // Player State
+    // Player State listener
     _player.playerStateStream.listen((state) {
       playbackState.add(playbackState.value.copyWith(
         playing: state.playing,
@@ -49,22 +49,30 @@ class MyAudioHandler extends BaseAudioHandler {
       final file = File(path);
       if (!await file.exists()) throw Exception('File not found: $path');
       
+      // Audio source set karke turant play karo
       await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       await _player.play();
       
+      // Media item set karo taaki notification aur UI update ho
       mediaItem.add(MediaItem(
         id: path,
         title: title,
         artist: artist,
-        duration: _player.duration,
+        duration: _player.duration ?? Duration.zero,
         artUri: _getArtUri(path),
       ));
       
+      // Playback state ko playing true par set karo taaki timer chale
       playbackState.add(playbackState.value.copyWith(
         playing: true,
         processingState: AudioProcessingState.ready,
+        controls: [
+          MediaControl.pause,
+          MediaControl.stop,
+          MediaControl.skipToNext,
+          MediaControl.skipToPrevious,
+        ],
       ));
-      
     } catch (e) {
       rethrow;
     }
@@ -105,11 +113,7 @@ class MyAudioHandler extends BaseAudioHandler {
   @override Future<void> click([MediaButton b = MediaButton.media]) async {}
   @override Future<void> setRating(Rating r, [Map<String, dynamic>? e]) async {}
   @override Future<void> customAction(String n, [Map<String, dynamic>? e]) async {}
-  
-  @override
-  Future<void> onTaskRemoved() async {
-    await stop();
-  }
+  @override Future<void> onTaskRemoved() async {await stop();}
 }
 
 Future<AudioHandler> initAudioService() async {
