@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:flutter/material.dart';
 
 AudioHandler? audioHandler;
 
@@ -53,7 +52,6 @@ class MyAudioHandler extends BaseAudioHandler {
       await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       await _player.play();
       
-      // Media item set karo taaki notification automatically update ho jaye
       mediaItem.add(MediaItem(
         id: path,
         title: title,
@@ -72,23 +70,16 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  // Artwork generate karo
   Uri? _getArtUri(String path) {
     final artFile = File('${path}_art.jpg');
     if (artFile.existsSync()) {
       return Uri.file(artFile.path);
     }
-    return Uri.parse('asset:///assets/icon/icon.png');
+    return null;
   }
 
-  @override Future<void> play() async {
-    await _player.play();
-  }
-  
-  @override Future<void> pause() async {
-    await _player.pause();
-  }
-  
+  @override Future<void> play() async => await _player.play();
+  @override Future<void> pause() async => await _player.pause();
   @override Future<void> stop() async {
     await _player.stop();
     await super.stop();
@@ -121,7 +112,6 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 }
 
-// Init Audio Service with Notification
 Future<AudioHandler> initAudioService() async {
   if (audioHandler != null) return audioHandler!;
   
@@ -130,12 +120,7 @@ Future<AudioHandler> initAudioService() async {
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.music.app.my_music.channel',
       androidNotificationChannelName: 'My Music Player',
-      androidNotificationIcon: 'drawable/ic_notification',
-      androidShowNotificationBadge: true,
-      androidStopForegroundOnPause: false,
       androidNotificationOngoing: true,
-      androidNotificationClickStartsActivity: true,
-      androidNotificationPlayPauseEnabled: true,
     ),
   );
   
