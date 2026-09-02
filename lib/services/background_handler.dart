@@ -2,13 +2,14 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:flutter/material.dart';
 
 AudioHandler? audioHandler;
 
 class MyAudioHandler extends BaseAudioHandler {
   final AudioPlayer _player = AudioPlayer();
   
-  // Streams expose
+  // Streams expose karo
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
   
@@ -27,11 +28,11 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // Position - 🔥 FIXED
+    // Position
     _player.positionStream.listen((position) {
       playbackState.add(playbackState.value.copyWith(
         playing: _player.playing,
-        position: position,  // ✅ position
+        updatePosition: position,
       ));
     });
 
@@ -52,6 +53,7 @@ class MyAudioHandler extends BaseAudioHandler {
       await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       await _player.play();
       
+      // Media item set karo taaki notification automatically update ho jaye
       mediaItem.add(MediaItem(
         id: path,
         title: title,
@@ -70,6 +72,7 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
+  // Artwork generate karo
   Uri? _getArtUri(String path) {
     final artFile = File('${path}_art.jpg');
     if (artFile.existsSync()) {
@@ -78,99 +81,43 @@ class MyAudioHandler extends BaseAudioHandler {
     return Uri.parse('asset:///assets/icon/icon.png');
   }
 
-  @override 
-  Future<void> play() async {
+  @override Future<void> play() async {
     await _player.play();
-    playbackState.add(playbackState.value.copyWith(playing: true));
   }
   
-  @override 
-  Future<void> pause() async {
+  @override Future<void> pause() async {
     await _player.pause();
-    playbackState.add(playbackState.value.copyWith(playing: false));
   }
   
-  @override 
-  Future<void> stop() async {
+  @override Future<void> stop() async {
     await _player.stop();
-    await AudioService.stop();
     await super.stop();
   }
   
-  @override 
-  Future<void> seek(Duration p) async {
-    await _player.seek(p);
-  }
+  @override Future<void> seek(Duration p) async => _player.seek(p);
+  @override Future<void> setVolume(double v) async => _player.setVolume(v);
+  @override Future<void> setSpeed(double s) async => _player.setSpeed(s);
   
-  @override 
-  Future<void> setVolume(double v) async {
-    await _player.setVolume(v);
-  }
-  
-  @override 
-  Future<void> setSpeed(double s) async {
-    await _player.setSpeed(s);
-  }
-  
-  @override 
-  Future<void> skipToNext() async {}
-  
-  @override 
-  Future<void> skipToPrevious() async {}
-  
-  @override 
-  Future<void> fastForward() async {
-    final pos = await _player.position;
-    await _player.seek(pos + const Duration(seconds: 10));
-  }
-  
-  @override 
-  Future<void> rewind() async {
-    final pos = await _player.position;
-    await _player.seek(pos - const Duration(seconds: 10));
-  }
-  
-  @override 
-  Future<void> setRepeatMode(AudioServiceRepeatMode r) async {}
-  
-  @override 
-  Future<void> setShuffleMode(AudioServiceShuffleMode s) async {}
-  
-  @override 
-  Future<void> addQueueItem(MediaItem i) async {}
-  
-  @override 
-  Future<void> addQueueItems(List<MediaItem> i) async {}
-  
-  @override 
-  Future<void> insertQueueItem(int i, MediaItem m) async {}
-  
-  @override 
-  Future<void> updateQueue(List<MediaItem> q) async {}
-  
-  @override 
-  Future<void> removeQueueItem(MediaItem m) async {}
-  
-  @override 
-  Future<void> moveQueueItem(int f, int t) async {}
-  
-  @override 
-  Future<void> skipToQueueItem(int i) async {}
-  
-  @override 
-  Future<void> click([MediaButton b = MediaButton.media]) async {}
-  
-  @override 
-  Future<void> setRating(Rating r, [Map<String, dynamic>? e]) async {}
-  
-  @override 
-  Future<void> customAction(String n, [Map<String, dynamic>? e]) async {}
+  @override Future<void> skipToNext() async {}
+  @override Future<void> skipToPrevious() async {}
+  @override Future<void> fastForward() async {}
+  @override Future<void> rewind() async {}
+  @override Future<void> setRepeatMode(AudioServiceRepeatMode r) async {}
+  @override Future<void> setShuffleMode(AudioServiceShuffleMode s) async {}
+  @override Future<void> addQueueItem(MediaItem i) async {}
+  @override Future<void> addQueueItems(List<MediaItem> i) async {}
+  @override Future<void> insertQueueItem(int i, MediaItem m) async {}
+  @override Future<void> updateQueue(List<MediaItem> q) async {}
+  @override Future<void> removeQueueItem(MediaItem m) async {}
+  @override Future<void> moveQueueItem(int f, int t) async {}
+  @override Future<void> skipToQueueItem(int i) async {}
+  @override Future<void> click([MediaButton b = MediaButton.media]) async {}
+  @override Future<void> setRating(Rating r, [Map<String, dynamic>? e]) async {}
+  @override Future<void> customAction(String n, [Map<String, dynamic>? e]) async {}
   
   @override
   Future<void> onTaskRemoved() async {
-    await _player.stop();
-    await AudioService.stop();
-    await super.stop();
+    await stop();
   }
 }
 
