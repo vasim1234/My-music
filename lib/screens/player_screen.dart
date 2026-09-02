@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/album_art.dart';
@@ -14,7 +15,7 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
+class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   int _selectedIndex = 0;
   
   bool isPlaying = false;
@@ -115,9 +116,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return name;
   }
 
+  // ============================================================
+  // LIFECYCLE METHODS
+  // ============================================================
   @override
   void initState() {
     super.initState();
+    
+    // 🔥 Observer register karo
+    WidgetsBinding.instance.addObserver(this);
     
     _pulseController = AnimationController(
       vsync: this,
@@ -144,10 +151,68 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    // 🔥 Observer remove karo
+    WidgetsBinding.instance.removeObserver(this);
+    
     _saveData();
     _pulseController.dispose();
     _sleepTimer?.cancel();
     super.dispose();
+  }
+
+  // ============================================================
+  // 🔥 APP LIFECYCLE HANDLING
+  // ============================================================
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    print('📱 App lifecycle changed: $state');
+    
+    if (state == AppLifecycleState.resumed) {
+      // 🔥 APP WAPAS AAYI - STATE SYNC KARO
+      _syncPlayerState();
+    }
+    
+    if (state == AppLifecycleState.paused) {
+      // 🔥 APP BACKGROUND MEIN GAYI
+      print('📱 App went to background');
+      _saveData();
+    }
+    
+    if (state == AppLifecycleState.detached) {
+      print('📱 App detached');
+    }
+  }
+
+  // 🔥 PLAYER STATE SYNC
+  Future<void> _syncPlayerState() async {
+    print('🔄 Syncing player state...');
+    
+    if (audioHandler is MyAudioHandler) {
+      final handler = audioHandler as MyAudioHandler;
+      
+      try {
+        final isPlaying = handler.isPlaying;
+        final isReady = handler.isReady;
+        final currentSong = handler.currentSong;
+        
+        setState(() {
+          this.isPlaying = isPlaying;
+          if (isReady && currentSong != null) {
+            print('✅ Player ready: $currentSong, playing: $isPlaying');
+          } else {
+            print('⚠️ Player not ready or no song');
+          }
+        });
+        
+        print('✅ State synced: playing=$isPlaying, ready=$isReady');
+      } catch (e) {
+        print('❌ Error syncing player state: $e');
+      }
+    } else {
+      print('⚠️ audioHandler is not MyAudioHandler');
+    }
   }
 
   // ============================================================
@@ -168,44 +233,44 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // LISTEN TO AUDIO STREAMS
   // ============================================================
   void _listenToAudioStreams() {
-  Future.delayed(const Duration(milliseconds: 500), () {
-    if (audioHandler is MyAudioHandler) {
-      final handler = audioHandler as MyAudioHandler;
-      
-      // Duration
-      handler.durationStream.listen((duration) {
-        if (mounted && duration != null) {
-          setState(() {
-            _duration = duration;
-          });
-        }
-      });
-      
-      // Position - ye stream se position update hogi
-      handler.positionStream.listen((position) {
-        if (mounted) {
-          setState(() {
-            _position = position;
-          });
-        }
-      });
-      
-      // Playback State
-      handler.playbackState.listen((state) {
-        if (mounted) {
-          setState(() {
-            isPlaying = state.playing;
-          });
-        }
-      });
-      
-      print('✅ Audio streams connected');
-    } else {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _listenToAudioStreams();
-      });
-    }
-  });
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (audioHandler is MyAudioHandler) {
+        final handler = audioHandler as MyAudioHandler;
+        
+        // Duration
+        handler.durationStream.listen((duration) {
+          if (mounted && duration != null) {
+            setState(() {
+              _duration = duration;
+            });
+          }
+        });
+        
+        // Position
+        handler.positionStream.listen((position) {
+          if (mounted) {
+            setState(() {
+              _position = position;
+            });
+          }
+        });
+        
+        // Playback State
+        handler.playbackState.listen((state) {
+          if (mounted) {
+            setState(() {
+              isPlaying = state.playing;
+            });
+          }
+        });
+        
+        print('✅ Audio streams connected');
+      } else {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _listenToAudioStreams();
+        });
+      }
+    });
   }
    
   // ============================================================
