@@ -23,9 +23,9 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 
   void _init() {
-    // 🔥 DURATION STREAM - with print
+    // 🔥 DURATION STREAM
     _player.durationStream.listen((duration) {
-      print('⏱️ [Native] Duration: $duration');
+      print('⏱️ [Native] Duration received: $duration');
       if (duration != null) {
         final current = mediaItem.value;
         if (current != null) {
@@ -34,10 +34,19 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // 🔥 POSITION STREAM - with print
+    // 🔥 POSITION STREAM - IMPORTANT: Har position update par playbackState update karo
     _player.positionStream.listen((position) {
       print('📍 [Native] Position: $position');
-      // playbackState automatically updates
+      // 🔥 CRITICAL: playbackState update karo taaki UI update ho
+      final currentState = playbackState.value;
+      playbackState.add(
+        currentState.copyWith(
+          position: position,
+          playing: _player.playing,
+          bufferedPosition: _player.bufferedPosition,
+          speed: _player.speed,
+        ),
+      );
     });
 
     // 🔥 PLAYER STATE STREAM
@@ -46,10 +55,14 @@ class MyAudioHandler extends BaseAudioHandler {
       final isPlaying = state.playing;
       final processingState = _getAudioProcessingState(state.processingState);
       
+      // 🔥 CRITICAL: playbackState update with all info
       playbackState.add(
         playbackState.value.copyWith(
           playing: isPlaying,
           processingState: processingState,
+          position: _player.position,
+          bufferedPosition: _player.bufferedPosition,
+          speed: _player.speed,
         ),
       );
       
@@ -72,6 +85,14 @@ class MyAudioHandler extends BaseAudioHandler {
           if (current != null) {
             mediaItem.add(current.copyWith(duration: duration));
           }
+          // 🔥 playbackState mein bhi update karo
+          playbackState.add(
+            playbackState.value.copyWith(
+              position: Duration.zero,
+              playing: true,
+              processingState: AudioProcessingState.ready,
+            ),
+          );
         }
       }
     });
@@ -130,10 +151,15 @@ class MyAudioHandler extends BaseAudioHandler {
 
       // 🔥 WAIT FOR DURATION - CRITICAL FIX!
       print('⏳ Waiting for duration...');
-      await Future.delayed(const Duration(milliseconds: 300));
+      int attempts = 0;
+      Duration? duration;
+      while (duration == null && attempts < 10) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        duration = _player.duration;
+        attempts++;
+        print('⏳ Attempt $attempts: Duration = $duration');
+      }
       
-      // 🔥 GET DURATION
-      final duration = _player.duration;
       print('⏱️ Duration loaded: $duration');
       
       // 🔥 UPDATE MEDIA ITEM WITH DURATION
@@ -154,16 +180,20 @@ class MyAudioHandler extends BaseAudioHandler {
       _currentSongPath = path;
       _isPlayerReady = true;
       
-      // 🔥 UPDATE PLAYBACK STATE
+      // 🔥 UPDATE PLAYBACK STATE WITH POSITION
       playbackState.add(
         playbackState.value.copyWith(
           playing: true,
           processingState: AudioProcessingState.ready,
+          position: Duration.zero,
+          bufferedPosition: Duration.zero,
+          speed: 1.0,
         ),
       );
       
       print('✅ Song playing successfully: $title');
       print('✅ Duration: $duration');
+      print('✅ Position: ${_player.position}');
       
     } catch (e, stacktrace) {
       print('❌ Error in playSong: $e');
@@ -189,12 +219,14 @@ class MyAudioHandler extends BaseAudioHandler {
       return;
     }
     await _player.play();
+    playbackState.add(playbackState.value.copyWith(playing: true));
   }
   
   @override 
   Future<void> pause() async {
     print('⏸️ Pause called');
     await _player.pause();
+    playbackState.add(playbackState.value.copyWith(playing: false));
   }
   
   @override 
@@ -203,6 +235,13 @@ class MyAudioHandler extends BaseAudioHandler {
     await _player.stop();
     _isPlayerReady = false;
     _currentSongPath = null;
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: false,
+        processingState: AudioProcessingState.idle,
+        position: Duration.zero,
+      ),
+    );
     await AudioService.stop();
     await super.stop();
   }
