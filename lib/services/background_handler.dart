@@ -94,7 +94,13 @@ class MyAudioHandler extends BaseAudioHandler {
 }
 
 Future<AudioHandler> initAudioService() async {
-  if (audioHandler != null) return audioHandler!;
-  audioHandler = MyAudioHandler();
-  return audioHandler!;
+  return await AudioService.init(
+    builder: () => MyAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.example.my_music.channel.audio',
+      androidNotificationChannelName: 'Music Playback',
+      androidNotificationOngoing: true,
+    ),
+  );
 }
+
