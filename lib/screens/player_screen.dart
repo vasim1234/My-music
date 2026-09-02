@@ -129,10 +129,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // 🔥 LIFECYCLE METHODS
   // ============================================================
   @override
-  void initState() {
-    super.initState();
-    
-    // Observer register karo
+void initState() {
+  super.initState();
+  
+  try {
+    print('📱 PlayerScreen initState');
     WidgetsBinding.instance.addObserver(this);
     
     _pulseController = AnimationController(
@@ -145,8 +146,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
 
     _loadSavedData();
-    _initAudioService();
-    _listenToAudioStreams();
+    
+    // 🔥 SAFE CALL - Try-catch with error handling
+    _initAudioService().then((_) {
+      _listenToAudioStreams();
+    }).catchError((e) {
+      print('❌ Audio service init error: $e');
+      // Show error dialog or retry
+    });
     
     Future.delayed(const Duration(milliseconds: 800), () {
       print('🔊 Audio service ready check');
@@ -156,7 +163,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         print('⚠️ Audio handler not ready yet');
       }
     });
+  } catch (e, stacktrace) {
+    print('❌ InitState error: $e');
+    print('📚 Stacktrace: $stacktrace');
   }
+}
 
   @override
   void dispose() {
