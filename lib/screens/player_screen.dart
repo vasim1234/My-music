@@ -117,121 +117,165 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-// 🔥 APP LIFECYCLE HANDLING
-// ============================================================
-@override
-void didChangeAppLifecycleState(AppLifecycleState state) {
-  super.didChangeAppLifecycleState(state);
-  
-  print('📱 App lifecycle changed: $state');
-  
-  if (state == AppLifecycleState.resumed) {
-    // 🔥 APP WAPAS AAYI - STATE SYNC KARO
-    _syncPlayerState();
-  }
-  
-  if (state == AppLifecycleState.paused) {
-    // 🔥 APP BACKGROUND MEIN GAYI
-    print('📱 App went to background');
-    _saveData();
-  }
-  
-  if (state == AppLifecycleState.detached) {
-    print('📱 App detached');
-  }
-}
-
-// 🔥 PLAYER STATE SYNC
-Future<void> _syncPlayerState() async {
-  print('🔄 Syncing player state...');
-  
-  if (audioHandler is MyAudioHandler) {
-    final handler = audioHandler as MyAudioHandler;
+  // 🔥 LIFECYCLE METHODS
+  // ============================================================
+  @override
+  void initState() {
+    super.initState();
     
-    try {
-      final isPlaying = handler.isPlaying;
-      final isReady = handler.isReady;
-      final currentSong = handler.currentSong;
-      
-      setState(() {
-        this.isPlaying = isPlaying;
-        if (isReady && currentSong != null) {
-          print('✅ Player ready: $currentSong, playing: $isPlaying');
-        } else {
-          print('⚠️ Player not ready or no song');
-        }
-      });
-      
-      print('✅ State synced: playing=$isPlaying, ready=$isReady');
-    } catch (e) {
-      print('❌ Error syncing player state: $e');
+    // Observer register karo
+    WidgetsBinding.instance.addObserver(this);
+    
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _loadSavedData();
+    _initAudioService();
+    _listenToAudioStreams();
+    
+    Future.delayed(const Duration(milliseconds: 800), () {
+      print('🔊 Audio service ready check');
+      if (audioHandler is MyAudioHandler) {
+        print('✅ Audio handler is ready');
+      } else {
+        print('⚠️ Audio handler not ready yet');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // Observer remove karo
+    WidgetsBinding.instance.removeObserver(this);
+    
+    _saveData();
+    _pulseController.dispose();
+    _sleepTimer?.cancel();
+    super.dispose();
+  }
+
+  // ============================================================
+  // 🔥 APP LIFECYCLE HANDLING
+  // ============================================================
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    print('📱 App lifecycle changed: $state');
+    
+    if (state == AppLifecycleState.resumed) {
+      // 🔥 APP WAPAS AAYI - STATE SYNC KARO
+      _syncPlayerState();
     }
-  } else {
-    print('⚠️ audioHandler is not MyAudioHandler');
+    
+    if (state == AppLifecycleState.paused) {
+      // 🔥 APP BACKGROUND MEIN GAYI
+      print('📱 App went to background');
+      _saveData();
+    }
+    
+    if (state == AppLifecycleState.detached) {
+      print('📱 App detached');
+    }
   }
-}
 
-// ============================================================
-// AUDIO SERVICE INITIALIZATION
-// ============================================================
-Future<void> _initAudioService() async {
-  try {
-    print('🔊 Initializing audio service...');
-    audioHandler = await initAudioService();
-    print('✅ Audio service initialized successfully');
-    print('🔍 audioHandler type: ${audioHandler.runtimeType}');
-  } catch (e) {
-    print('❌ Audio service error: $e');
-  }
-}
-
-// ============================================================
-// LISTEN TO AUDIO STREAMS - 🔥 FIXED WITH PRINT LOGS
-// ============================================================
-void _listenToAudioStreams() {
-  Future.delayed(const Duration(milliseconds: 500), () {
+  // 🔥 PLAYER STATE SYNC
+  Future<void> _syncPlayerState() async {
+    print('🔄 Syncing player state...');
+    
     if (audioHandler is MyAudioHandler) {
       final handler = audioHandler as MyAudioHandler;
       
-      // 🔥 DURATION - with print
-      handler.durationStream.listen((duration) {
-        if (mounted && duration != null) {
-          setState(() {
-            _duration = duration;
-          });
-          print('⏱️ UI Duration: $duration');
-        }
-      });
-      
-      // 🔥 POSITION - with print
-      handler.positionStream.listen((position) {
-        if (mounted) {
-          setState(() {
-            _position = position;
-          });
-          print('📍 UI Position: $position');
-        }
-      });
-      
-      // 🔥 PLAYBACK STATE - with print
-      handler.playbackState.listen((state) {
-        if (mounted) {
-          setState(() {
-            isPlaying = state.playing;
-          });
-          print('🎵 UI Playing: ${state.playing}');
-        }
-      });
-      
-      print('✅ Audio streams connected');
+      try {
+        final isPlaying = handler.isPlaying;
+        final isReady = handler.isReady;
+        final currentSong = handler.currentSong;
+        
+        setState(() {
+          this.isPlaying = isPlaying;
+          if (isReady && currentSong != null) {
+            print('✅ Player ready: $currentSong, playing: $isPlaying');
+          } else {
+            print('⚠️ Player not ready or no song');
+          }
+        });
+        
+        print('✅ State synced: playing=$isPlaying, ready=$isReady');
+      } catch (e) {
+        print('❌ Error syncing player state: $e');
+      }
     } else {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _listenToAudioStreams();
-      });
+      print('⚠️ audioHandler is not MyAudioHandler');
     }
-  });
-}
-  
+  }
+
+  // ============================================================
+  // AUDIO SERVICE INITIALIZATION
+  // ============================================================
+  Future<void> _initAudioService() async {
+    try {
+      print('🔊 Initializing audio service...');
+      audioHandler = await initAudioService();
+      print('✅ Audio service initialized successfully');
+      print('🔍 audioHandler type: ${audioHandler.runtimeType}');
+    } catch (e) {
+      print('❌ Audio service error: $e');
+    }
+  }
+
+  // ============================================================
+  // LISTEN TO AUDIO STREAMS - 🔥 FIXED WITH PRINT LOGS
+  // ============================================================
+  void _listenToAudioStreams() {
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (audioHandler is MyAudioHandler) {
+        final handler = audioHandler as MyAudioHandler;
+        
+        // 🔥 DURATION - with print
+        handler.durationStream.listen((duration) {
+          if (mounted && duration != null) {
+            setState(() {
+              _duration = duration;
+            });
+            print('⏱️ UI Duration: $duration');
+          }
+        });
+        
+        // 🔥 POSITION - with print
+        handler.positionStream.listen((position) {
+          if (mounted) {
+            setState(() {
+              _position = position;
+            });
+            print('📍 UI Position: $position');
+          }
+        });
+        
+        // 🔥 PLAYBACK STATE - with print
+        handler.playbackState.listen((state) {
+          if (mounted) {
+            setState(() {
+              isPlaying = state.playing;
+            });
+            print('🎵 UI Playing: ${state.playing}');
+          }
+        });
+        
+        print('✅ Audio streams connected');
+      } else {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _listenToAudioStreams();
+        });
+      }
+    });
+  }
+   
   // ============================================================
   // EQUALIZER FUNCTIONS
   // ============================================================
@@ -1125,80 +1169,80 @@ void _listenToAudioStreams() {
   }
 
   Future<void> _playCurrentSongInQueue() async {
-  if (_playlist.isEmpty) {
-    print('⚠️ Playlist is empty');
-    return;
-  }
-  
-  try {
-    final currentFile = _playlist[_currentIndex];
-    String cleanName = _cleanSongName(currentFile.name);
-    print('🎵 Playing: $cleanName');
-    print('📁 Path: ${currentFile.path}');
-    
-    if (currentFile.path == null) {
-      print('❌ Path is null');
+    if (_playlist.isEmpty) {
+      print('⚠️ Playlist is empty');
       return;
     }
+    
+    try {
+      final currentFile = _playlist[_currentIndex];
+      String cleanName = _cleanSongName(currentFile.name);
+      print('🎵 Playing: $cleanName');
+      print('📁 Path: ${currentFile.path}');
+      
+      if (currentFile.path == null) {
+        print('❌ Path is null');
+        return;
+      }
 
-    // 🔥 FILE CHECK
-    final file = File(currentFile.path!);
-    if (!await file.exists()) {
-      print('❌ File does NOT exist: ${currentFile.path}');
+      // 🔥 FILE CHECK
+      final file = File(currentFile.path!);
+      if (!await file.exists()) {
+        print('❌ File does NOT exist: ${currentFile.path}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ File not found: ${file.path.split('/').last}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      print('✅ File exists');
+
+      // 🔥 UPDATE RECENT
+      if (!_recent.contains(currentFile)) {
+        _recent.insert(0, currentFile);
+        if (_recent.length > 50) _recent.removeLast();
+        _saveData();
+      }
+
+      // 🔥 INIT AUDIO SERVICE
+      if (audioHandler == null) {
+        print('⚠️ audioHandler is null, initializing...');
+        await _initAudioService();
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      if (audioHandler is MyAudioHandler) {
+        print('✅ audioHandler is MyAudioHandler');
+        await (audioHandler as MyAudioHandler).playSong(
+          currentFile.path!,
+          cleanName,
+          'Luna Echo',
+        );
+        
+        // 🔥 WAIT FOR PLAYBACK
+        await Future.delayed(const Duration(milliseconds: 1000));
+        
+        if (mounted) {
+          setState(() {
+            isPlaying = true;
+          });
+          _saveData();
+          print('✅ Song playing: $cleanName');
+        }
+      } else {
+        print('❌ audioHandler is not MyAudioHandler');
+      }
+    } catch (e) {
+      print('❌ Error playing song: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ File not found: ${file.path.split('/').last}'),
+          content: Text('❌ Error: $e'),
           backgroundColor: Colors.red,
         ),
       );
-      return;
     }
-    print('✅ File exists');
-
-    // 🔥 UPDATE RECENT
-    if (!_recent.contains(currentFile)) {
-      _recent.insert(0, currentFile);
-      if (_recent.length > 50) _recent.removeLast();
-      _saveData();
-    }
-
-    // 🔥 INIT AUDIO SERVICE
-    if (audioHandler == null) {
-      print('⚠️ audioHandler is null, initializing...');
-      await _initAudioService();
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
-
-    if (audioHandler is MyAudioHandler) {
-      print('✅ audioHandler is MyAudioHandler');
-      await (audioHandler as MyAudioHandler).playSong(
-        currentFile.path!,
-        cleanName,
-        'Luna Echo',
-      );
-      
-      // 🔥 WAIT FOR PLAYBACK
-      await Future.delayed(const Duration(milliseconds: 1000));
-      
-      if (mounted) {
-        setState(() {
-          isPlaying = true;
-        });
-        _saveData();
-        print('✅ Song playing: $cleanName');
-      }
-    } else {
-      print('❌ audioHandler is not MyAudioHandler');
-    }
-  } catch (e) {
-    print('❌ Error playing song: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('❌ Error: $e'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
   }
 
   Future<void> _playSpecificSong(PlatformFile song, {List<PlatformFile>? playlist}) async {
