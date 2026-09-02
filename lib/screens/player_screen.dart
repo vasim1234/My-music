@@ -1189,80 +1189,86 @@ void initState() {
   }
 
   Future<void> _playCurrentSongInQueue() async {
-    if (_playlist.isEmpty) {
-      print('⚠️ Playlist is empty');
+  if (_playlist.isEmpty) {
+    print('⚠️ Playlist is empty');
+    return;
+  }
+  
+  try {
+    final currentFile = _playlist[_currentIndex];
+    String cleanName = _cleanSongName(currentFile.name);
+    print('🎵 Playing: $cleanName');
+    print('📁 Path: ${currentFile.path}');
+    
+    if (currentFile.path == null) {
+      print('❌ Path is null');
       return;
     }
-    
-    try {
-      final currentFile = _playlist[_currentIndex];
-      String cleanName = _cleanSongName(currentFile.name);
-      print('🎵 Playing: $cleanName');
-      print('📁 Path: ${currentFile.path}');
-      
-      if (currentFile.path == null) {
-        print('❌ Path is null');
-        return;
-      }
 
-      // 🔥 FILE CHECK
-      final file = File(currentFile.path!);
-      if (!await file.exists()) {
-        print('❌ File does NOT exist: ${currentFile.path}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ File not found: ${file.path.split('/').last}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-      print('✅ File exists');
-
-      // 🔥 UPDATE RECENT
-      if (!_recent.contains(currentFile)) {
-        _recent.insert(0, currentFile);
-        if (_recent.length > 50) _recent.removeLast();
-        _saveData();
-      }
-
-      // 🔥 INIT AUDIO SERVICE
-      if (audioHandler == null) {
-        print('⚠️ audioHandler is null, initializing...');
-        await _initAudioService();
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-
-      if (audioHandler is MyAudioHandler) {
-        print('✅ audioHandler is MyAudioHandler');
-        await (audioHandler as MyAudioHandler).playSong(
-          currentFile.path!,
-          cleanName,
-          'Luna Echo',
-        );
-        
-        // 🔥 WAIT FOR PLAYBACK
-        await Future.delayed(const Duration(milliseconds: 1000));
-        
-        if (mounted) {
-          setState(() {
-            isPlaying = true;
-          });
-          _saveData();
-          print('✅ Song playing: $cleanName');
-        }
-      } else {
-        print('❌ audioHandler is not MyAudioHandler');
-      }
-    } catch (e) {
-      print('❌ Error playing song: $e');
+    final file = File(currentFile.path!);
+    if (!await file.exists()) {
+      print('❌ File does NOT exist: ${currentFile.path}');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Error: $e'),
+          content: Text('❌ File not found: ${file.path.split('/').last}'),
           backgroundColor: Colors.red,
         ),
       );
+      return;
     }
+    print('✅ File exists');
+
+    if (!_recent.contains(currentFile)) {
+      _recent.insert(0, currentFile);
+      if (_recent.length > 50) _recent.removeLast();
+      _saveData();
+    }
+
+    if (audioHandler == null) {
+      print('⚠️ audioHandler is null, initializing...');
+      await _initAudioService();
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (audioHandler is MyAudioHandler) {
+      print('✅ audioHandler is MyAudioHandler');
+      
+      final handler = audioHandler as MyAudioHandler;
+      
+      // 🔥 SET AUTO-NEXT CALLBACK
+      handler.onSongComplete = () {
+        print('🎵 Auto-next triggered from handler');
+        _playNextSong();
+      };
+      
+      // 🔥 PLAY SONG
+      await handler.playSong(
+        currentFile.path!,
+        cleanName,
+        'Luna Echo',
+      );
+      
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (mounted) {
+        setState(() {
+          isPlaying = true;
+        });
+        _saveData();
+        print('✅ Song playing: $cleanName');
+      }
+    } else {
+      print('❌ audioHandler is not MyAudioHandler');
+    }
+  } catch (e) {
+    print('❌ Error playing song: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('❌ Error: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
   }
 
   Future<void> _playSpecificSong(PlatformFile song, {List<PlatformFile>? playlist}) async {
