@@ -27,28 +27,38 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // Position - 🔥 FIX: position parameter hataya
+    // Position
     _player.positionStream.listen((position) {
       playbackState.add(playbackState.value.copyWith(
         playing: _player.playing,
       ));
     });
 
-    // Player State
+    // Player State - 🔥 FIX: Proper mapping taaki state sync rahe
     _player.playerStateStream.listen((state) {
+      final playing = state.playing;
       playbackState.add(playbackState.value.copyWith(
-        playing: state.playing,
-        processingState: AudioProcessingState.ready,
+        playing: playing,
+        processingState: const {
+          ProcessingState.idle: AudioProcessingState.idle,
+          ProcessingState.loading: AudioProcessingState.loading,
+          ProcessingState.buffering: AudioProcessingState.buffering,
+          ProcessingState.ready: AudioProcessingState.ready,
+          ProcessingState.completed: AudioProcessingState.completed,
+        }[state.processingState] ?? AudioProcessingState.idle,
       ));
     });
   }
 
   Future<void> playSong(String path, String title, String artist) async {
     try {
-      await _player.stop(); // <-- Yahan line 47 par daalna hai
+      // 🔥 Naya gaana chalane se pehle purana stop karo taaki overlap na ho
+      await _player.stop();
+      
       final file = File(path);
-       if (!await file.exists()) throw Exception('File not found: $path');
-       await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
+      if (!await file.exists()) throw Exception('File not found: $path');
+      
+      await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       await _player.play();
       
       mediaItem.add(MediaItem(
