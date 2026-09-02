@@ -372,8 +372,7 @@ Future<AudioHandler> initAudioService() async {
       // 🔥 FIX: androidEnableQueue parameter hatao - is version mein nahi hai
       androidStopForegroundOnPause: false,
       androidNotificationOngoing: true,
-      androidNotificationClickStartsActivity: true,
-      androidNotificationPlayPauseEnabled: true,
+      androidNotificationClickStartsActivity: true,  
     ),
   );
   
