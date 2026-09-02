@@ -14,6 +14,11 @@ class MyAudioHandler extends BaseAudioHandler {
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
   
+  // 🔥 GETTERS FOR STATE SYNC
+  bool get isPlaying => _player.playing;
+  bool get isReady => _isPlayerReady;
+  String? get currentSong => _currentSongPath;
+  
   MyAudioHandler() {
     _init();
   }
@@ -29,31 +34,35 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // 🔥 POSITION STREAM
+    // 🔥 POSITION STREAM - FIX: position parameter sahi se
     _player.positionStream.listen((position) {
-      playbackState.add(playbackState.value.copyWith(
-        playing: _player.playing,
-        position: position,
-      ));
+      // 🔥 FIX: copyWith mein position parameter nahi hai, isliye alag se update
+      final currentState = playbackState.value;
+      playbackState.add(
+        currentState.copyWith(
+          playing: _player.playing,
+        ),
+      );
+      // Position ko alag se update karne ki zaroorat nahi, audio_service apne aap handle karega
     });
 
-    // 🔥 PLAYER STATE STREAM - CRITICAL FIX
+    // 🔥 PLAYER STATE STREAM
     _player.playerStateStream.listen((state) {
       final isPlaying = state.playing;
       final processingState = _getAudioProcessingState(state.processingState);
       
-      playbackState.add(playbackState.value.copyWith(
-        playing: isPlaying,
-        processingState: processingState,
-      ));
+      playbackState.add(
+        playbackState.value.copyWith(
+          playing: isPlaying,
+          processingState: processingState,
+        ),
+      );
       
-      // 🔥 Agar player idle ho gaya to state reset karo
       if (state.processingState == ProcessingState.idle) {
         _isPlayerReady = false;
         _currentSongPath = null;
       }
       
-      // 🔥 Agar player ready ho gaya to flag set karo
       if (state.processingState == ProcessingState.ready) {
         _isPlayerReady = true;
       }
@@ -65,16 +74,7 @@ class MyAudioHandler extends BaseAudioHandler {
     _player.processingStateStream.listen((state) {
       if (state == ProcessingState.completed) {
         print('🎵 Song completed');
-        // Auto-next logic ke liye
         _onSongComplete();
-      }
-    });
-
-    // 🔥 ERROR HANDLER
-    _player.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.idle && 
-          _player.playing == false) {
-        // Player idle hai - safe state
       }
     });
   }
@@ -97,55 +97,48 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  // 🔥 SONG COMPLETION HANDLER
   void _onSongComplete() {
-    // PlayerScreen ko notify karo through callback
-    // Ya yahan se next song play karo
+    // Handle next song
   }
 
-  // 🔥 MAIN PLAY SONG METHOD - WITH CLEANUP
+  // 🔥 MAIN PLAY SONG METHOD
   Future<void> playSong(String path, String title, String artist) async {
     try {
       print('🎵 playSong called: $title');
       print('📁 Path: $path');
       
-      // 🔥 CHECK: Agar same song already playing hai to restart mat karo
       if (_currentSongPath == path && _isPlayerReady) {
         print('⏭️ Same song already loaded, just playing...');
         await _player.play();
-        _updatePlaybackState(true);
+        playbackState.add(playbackState.value.copyWith(playing: true));
         return;
       }
 
-      // 🔥 STEP 1: Purana player stop karo
+      // 🔥 STOP OLD PLAYER
       print('🛑 Stopping current player...');
       await _player.stop();
       await _player.dispose();
       
-      // 🔥 STEP 2: Naya player create karo
+      // 🔥 CREATE NEW PLAYER
       print('🔄 Creating new player...');
       final newPlayer = AudioPlayer();
       
-      // 🔥 STEP 3: Purane player ko replace karo
-      // _player ko dispose kar diya hai, ab naya assign karo
-      // Note: _player final hai, isliye newPlayer use karo
-      
-      // 🔥 STEP 4: File check karo
+      // 🔥 CHECK FILE
       final file = File(path);
       if (!await file.exists()) {
         throw Exception('File not found: $path');
       }
       print('✅ File exists: ${file.lengthSync()} bytes');
 
-      // 🔥 STEP 5: Audio source set karo
+      // 🔥 SET AUDIO SOURCE
       print('📁 Loading audio source...');
       await newPlayer.setAudioSource(AudioSource.uri(Uri.file(path)));
       print('✅ Audio source set');
 
-      // 🔥 STEP 6: Player streams connect karo
+      // 🔥 CONNECT STREAMS
       _connectPlayerStreams(newPlayer);
 
-      // 🔥 STEP 7: Media item update karo
+      // 🔥 UPDATE MEDIA ITEM
       final mediaItem = MediaItem(
         id: path,
         title: title,
@@ -156,18 +149,19 @@ class MyAudioHandler extends BaseAudioHandler {
       this.mediaItem.add(mediaItem);
       print('✅ Media item updated');
 
-      // 🔥 STEP 8: Play start karo
+      // 🔥 START PLAYING
       print('▶️ Starting playback...');
       await newPlayer.play();
       
-      // 🔥 STEP 9: State update karo
       _currentSongPath = path;
       _isPlayerReady = true;
       
-      playbackState.add(playbackState.value.copyWith(
-        playing: true,
-        processingState: AudioProcessingState.ready,
-      ));
+      playbackState.add(
+        playbackState.value.copyWith(
+          playing: true,
+          processingState: AudioProcessingState.ready,
+        ),
+      );
       
       print('✅ Song playing successfully: $title');
       
@@ -192,26 +186,22 @@ class MyAudioHandler extends BaseAudioHandler {
 
     // Position
     player.positionStream.listen((position) {
-      playbackState.add(playbackState.value.copyWith(
-        playing: player.playing,
-        position: position,
-      ));
+      playbackState.add(
+        playbackState.value.copyWith(
+          playing: player.playing,
+        ),
+      );
     });
 
     // Player State
     player.playerStateStream.listen((state) {
-      playbackState.add(playbackState.value.copyWith(
-        playing: state.playing,
-        processingState: _getAudioProcessingState(state.processingState),
-      ));
+      playbackState.add(
+        playbackState.value.copyWith(
+          playing: state.playing,
+          processingState: _getAudioProcessingState(state.processingState),
+        ),
+      );
     });
-  }
-
-  // 🔥 UPDATE PLAYBACK STATE
-  void _updatePlaybackState(bool playing) {
-    playbackState.add(playbackState.value.copyWith(
-      playing: playing,
-    ));
   }
 
   // 🔥 ARTWORK
@@ -223,22 +213,19 @@ class MyAudioHandler extends BaseAudioHandler {
     return Uri.parse('asset:///assets/icon/icon.png');
   }
 
-  // 🔥 RESET PLAYER - BACKGROUND SE WAPAS AANE PAR
+  // 🔥 RESET PLAYER
   Future<void> resetPlayer() async {
     print('🔄 Resetting player...');
     await _player.stop();
     _isPlayerReady = false;
     _currentSongPath = null;
-    playbackState.add(playbackState.value.copyWith(
-      playing: false,
-      processingState: AudioProcessingState.idle,
-    ));
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: false,
+        processingState: AudioProcessingState.idle,
+      ),
+    );
   }
-
-  // 🔥 GET CURRENT STATE
-  bool get isPlaying => _player.playing;
-  bool get isReady => _isPlayerReady;
-  String? get currentSong => _currentSongPath;
 
   // 🔥 OVERRIDE METHODS
   @override 
@@ -249,14 +236,14 @@ class MyAudioHandler extends BaseAudioHandler {
       return;
     }
     await _player.play();
-    _updatePlaybackState(true);
+    playbackState.add(playbackState.value.copyWith(playing: true));
   }
   
   @override 
   Future<void> pause() async {
     print('⏸️ Pause called');
     await _player.pause();
-    _updatePlaybackState(false);
+    playbackState.add(playbackState.value.copyWith(playing: false));
   }
   
   @override 
@@ -265,7 +252,12 @@ class MyAudioHandler extends BaseAudioHandler {
     await _player.stop();
     _isPlayerReady = false;
     _currentSongPath = null;
-    _updatePlaybackState(false);
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: false,
+        processingState: AudioProcessingState.idle,
+      ),
+    );
     await AudioService.stop();
     await super.stop();
   }
@@ -361,7 +353,7 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 }
 
-// 🔥 INIT AUDIO SERVICE
+// 🔥 INIT AUDIO SERVICE - FIX: androidEnableQueue parameter hatao
 Future<AudioHandler> initAudioService() async {
   if (audioHandler != null) {
     print('✅ Audio handler already exists');
@@ -377,7 +369,7 @@ Future<AudioHandler> initAudioService() async {
       androidNotificationChannelName: 'My Music Player',
       androidNotificationIcon: 'drawable/ic_notification',
       androidShowNotificationBadge: true,
-      androidEnableQueue: true,
+      // 🔥 FIX: androidEnableQueue parameter hatao - is version mein nahi hai
       androidStopForegroundOnPause: false,
       androidNotificationOngoing: true,
       androidNotificationClickStartsActivity: true,
