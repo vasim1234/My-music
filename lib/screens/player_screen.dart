@@ -104,12 +104,21 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return _albumGradients[index % _albumGradients.length];
   }
 
-  String _cleanSongName(String fileName) {
+    String _cleanSongName(String fileName) {
+    // 1. Extension (.mp3, .sav etc.) hatao
     String name = fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
-    name = name.replaceAll(RegExp(r'\(\w*_\d+K\)', caseSensitive: false), '');
-    name = name.replaceAll(RegExp(r'\(\d+K\)', caseSensitive: false), '');
-    name = name.replaceAll(RegExp(r'\(MP3_\d+K\)', caseSensitive: false), '');
-    name = name.trim();
+    
+    // 2. Extra tags jaise (MP3_128K), (128K), (PaglaSongs) wagerah hatao
+    name = name.replaceAll(RegExp(r'\([^)]*\)', caseSensitive: false), '');
+    name = name.replaceAll(RegExp(r'\[[^\]]*\]', caseSensitive: false), '');
+    
+    // 3. Web/Source tags (jaise PagalWorld, Mr-Jatt, PagalSong) hatao
+    name = name.replaceAll(RegExp(r'(pagalworld|mr-jatt|pagalsong|ytmp3|kbps)', caseSensitive: false), '');
+    
+    // 4. Extra spaces aur underscores saaf karein
+    name = name.replaceAll('_', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    // 5. Agar naam 35 characters se bada ho to '...' lagao
     if (name.length > 35) {
       name = '${name.substring(0, 35)}...';
     }
