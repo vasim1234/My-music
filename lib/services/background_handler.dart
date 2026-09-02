@@ -90,7 +90,7 @@ class MyAudioHandler extends BaseAudioHandler {
   @override Future<void> click([MediaButton b = MediaButton.media]) async {}
   @override Future<void> setRating(Rating r, [Map<String, dynamic>? e]) async {}
   @override Future<void> customAction(String n, [Map<String, dynamic>? e]) async {}
-  @override Future<void> onTaskRemoved() async {}
+  @override Future<void> onTaskRemoved() async { await stop(); }
 }
 
 Future<AudioHandler> initAudioService() async {
