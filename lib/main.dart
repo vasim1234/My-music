@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:my_music/services/background_handler.dart';
 import 'screens/player_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initAudioService();
   runApp(const MyMusicApp());
 }
 
@@ -21,3 +24,4 @@ class MyMusicApp extends StatelessWidget {
     );
   }
 }
+
