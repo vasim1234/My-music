@@ -23,9 +23,9 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 
   void _init() {
-    // 🔥 DURATION STREAM
+    // 🔥 DURATION STREAM - with print
     _player.durationStream.listen((duration) {
-      print('⏱️ Duration received: $duration');
+      print('⏱️ [Native] Duration: $duration');
       if (duration != null) {
         final current = mediaItem.value;
         if (current != null) {
@@ -34,15 +34,15 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    // 🔥 POSITION STREAM
+    // 🔥 POSITION STREAM - with print
     _player.positionStream.listen((position) {
-      print('📍 Position: $position');
-      // Position ko playbackState mein update karo
+      print('📍 [Native] Position: $position');
+      // playbackState automatically updates
     });
 
     // 🔥 PLAYER STATE STREAM
     _player.playerStateStream.listen((state) {
-      print('🎵 State: ${state.processingState}, playing: ${state.playing}');
+      print('🎵 [Native] State: ${state.processingState}, playing: ${state.playing}');
       final isPlaying = state.playing;
       final processingState = _getAudioProcessingState(state.processingState);
       
@@ -58,8 +58,21 @@ class MyAudioHandler extends BaseAudioHandler {
         _currentSongPath = null;
       }
       
-      if (state.processingState == ProcessingState.ready) {
+      if (state.processingState == ProcessingState.ready ||
+          state.processingState == ProcessingState.completed) {
         _isPlayerReady = true;
+      }
+      
+      // 🔥 CRITICAL: Jab loading complete ho jaye toh duration update karo
+      if (state.processingState == ProcessingState.ready) {
+        final duration = _player.duration;
+        if (duration != null && duration > Duration.zero) {
+          print('⏱️ [Native] Duration ready: $duration');
+          final current = mediaItem.value;
+          if (current != null) {
+            mediaItem.add(current.copyWith(duration: duration));
+          }
+        }
       }
     });
 
@@ -68,14 +81,6 @@ class MyAudioHandler extends BaseAudioHandler {
       if (state == ProcessingState.completed) {
         print('🎵 Song completed');
         _onSongComplete();
-      }
-    });
-
-    // 🔥 ERROR HANDLER
-    _player.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.idle && 
-          state.playing == false) {
-        print('⚠️ Player is idle');
       }
     });
   }
@@ -107,28 +112,31 @@ class MyAudioHandler extends BaseAudioHandler {
       print('🎵 playSong called: $title');
       print('📁 Path: $path');
       
+      // 🔥 STOP OLD PLAYER
+      await _player.stop();
+      _isPlayerReady = false;
+      
       // 🔥 CHECK FILE
       final file = File(path);
       if (!await file.exists()) {
-        print('❌ File not found: $path');
         throw Exception('File not found: $path');
       }
       print('✅ File exists: ${file.lengthSync()} bytes');
-
-      // 🔥 STOP CURRENT PLAYER
-      await _player.stop();
-      print('🛑 Player stopped');
 
       // 🔥 SET AUDIO SOURCE
       print('📁 Loading audio source...');
       await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       print('✅ Audio source set');
 
+      // 🔥 WAIT FOR DURATION - CRITICAL FIX!
+      print('⏳ Waiting for duration...');
+      await Future.delayed(const Duration(milliseconds: 300));
+      
       // 🔥 GET DURATION
       final duration = _player.duration;
-      print('⏱️ Duration: $duration');
-
-      // 🔥 UPDATE MEDIA ITEM
+      print('⏱️ Duration loaded: $duration');
+      
+      // 🔥 UPDATE MEDIA ITEM WITH DURATION
       final mediaItem = MediaItem(
         id: path,
         title: title,
@@ -137,7 +145,7 @@ class MyAudioHandler extends BaseAudioHandler {
         artUri: _getArtUri(path),
       );
       this.mediaItem.add(mediaItem);
-      print('✅ Media item updated');
+      print('✅ Media item updated with duration: $duration');
 
       // 🔥 START PLAYING
       print('▶️ Starting playback...');
@@ -181,14 +189,12 @@ class MyAudioHandler extends BaseAudioHandler {
       return;
     }
     await _player.play();
-    playbackState.add(playbackState.value.copyWith(playing: true));
   }
   
   @override 
   Future<void> pause() async {
     print('⏸️ Pause called');
     await _player.pause();
-    playbackState.add(playbackState.value.copyWith(playing: false));
   }
   
   @override 
@@ -197,12 +203,6 @@ class MyAudioHandler extends BaseAudioHandler {
     await _player.stop();
     _isPlayerReady = false;
     _currentSongPath = null;
-    playbackState.add(
-      playbackState.value.copyWith(
-        playing: false,
-        processingState: AudioProcessingState.idle,
-      ),
-    );
     await AudioService.stop();
     await super.stop();
   }
@@ -210,6 +210,7 @@ class MyAudioHandler extends BaseAudioHandler {
   @override 
   Future<void> seek(Duration p) async {
     if (_isPlayerReady) {
+      print('⏩ Seeking to: $p');
       await _player.seek(p);
     }
   }
@@ -226,8 +227,18 @@ class MyAudioHandler extends BaseAudioHandler {
   
   @override Future<void> skipToNext() async {}
   @override Future<void> skipToPrevious() async {}
-  @override Future<void> fastForward() async {}
-  @override Future<void> rewind() async {}
+  @override Future<void> fastForward() async {
+    if (_isPlayerReady) {
+      final pos = await _player.position;
+      await _player.seek(pos + const Duration(seconds: 10));
+    }
+  }
+  @override Future<void> rewind() async {
+    if (_isPlayerReady) {
+      final pos = await _player.position;
+      await _player.seek(pos - const Duration(seconds: 10));
+    }
+  }
   @override Future<void> setRepeatMode(AudioServiceRepeatMode r) async {}
   @override Future<void> setShuffleMode(AudioServiceShuffleMode s) async {}
   @override Future<void> addQueueItem(MediaItem i) async {}
