@@ -1159,12 +1159,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       print('✅ Playing via playFromUri');
       
       await audioHandler!.playFromUri(
-        Uri.file(currentFile.path!),
-        extras: {
-          'title': cleanName,
-          'artist': 'Luna Echo',
-        },
-      );
+  Uri.file(currentFile.path!),
+  {
+    'title': cleanName,
+    'artist': 'Luna Echo',
+  }
+);
       
       await Future.delayed(const Duration(milliseconds: 500));
       
