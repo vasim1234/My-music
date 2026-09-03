@@ -75,7 +75,7 @@ class MyAudioHandler extends BaseAudioHandler {
 
   // 🔥 FIX: Override playFromUri
   @override
-  Future<void> playFromUri(Uri uri, {Map<String, dynamic>? extras}) async {
+Future<void> playFromUri(Uri uri, [Map<String, dynamic>? extras]) async {
     try {
       final path = uri.toFilePath();
       final title = extras?['title'] ?? 'Unknown Song';
