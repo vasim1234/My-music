@@ -37,10 +37,24 @@ class MyAudioHandler extends BaseAudioHandler {
       print('📍 Position: ${position.inSeconds}s');
     });
 
+    // 🔥 FIX: Complete playerStateStream with controls
     _player.playerStateStream.listen((state) {
       print('🎵 State: ${state.processingState}, playing: ${state.playing}');
+      
+      // 🔥 CRITICAL: Add controls for background notification
       playbackState.add(
         playbackState.value.copyWith(
+          controls: [
+            MediaControl.skipToPrevious,
+            state.playing ? MediaControl.pause : MediaControl.play,
+            MediaControl.stop,
+            MediaControl.skipToNext,
+          ],
+          systemActions: const {
+            MediaAction.seek,
+            MediaAction.seekForward,
+            MediaAction.seekBackward,
+          },
           playing: state.playing,
           processingState: _getAudioProcessingState(state.processingState),
         ),
@@ -59,41 +73,26 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  // 🔥 PLAY SONG WITH FILE ACCESS CHECK
-  Future<void> playSong(String path, String title, String artist) async {
+  // 🔥 FIX: Override playFromUri
+  @override
+  Future<void> playFromUri(Uri uri, {Map<String, dynamic>? extras}) async {
     try {
-      print('🎵 playSong: $title');
+      final path = uri.toFilePath();
+      final title = extras?['title'] ?? 'Unknown Song';
+      final artist = extras?['artist'] ?? 'Unknown Artist';
+      
+      print('🎵 playFromUri: $title');
       print('📁 Path: $path');
       
-      // 🔥 CHECK IF FILE EXISTS
       final file = File(path);
       if (!await file.exists()) {
-        print('❌ File not found at: $path');
-        
-        // 🔥 TRY WITH ALTERNATIVE PATH
-        String altPath = path.replaceFirst('/storage/emulated/0/', '/sdcard/');
-        final altFile = File(altPath);
-        if (await altFile.exists()) {
-          print('✅ Found at alternative path: $altPath');
-          return await _playFile(altFile, title, artist);
-        }
-        
-        throw Exception('File not found: $path');
+        print('❌ File not found: $path');
+        throw Exception('File not found');
       }
-      
       print('✅ File exists: ${file.lengthSync()} bytes');
-      return await _playFile(file, title, artist);
-      
-    } catch (e) {
-      print('❌ Error: $e');
-      rethrow;
-    }
-  }
 
-  Future<void> _playFile(File file, String title, String artist) async {
-    try {
       await _player.stop();
-      await _player.setAudioSource(AudioSource.uri(Uri.file(file.path)));
+      await _player.setAudioSource(AudioSource.uri(uri));
       print('✅ Audio source set');
 
       await Future.delayed(const Duration(milliseconds: 200));
@@ -101,48 +100,96 @@ class MyAudioHandler extends BaseAudioHandler {
       print('⏱️ Duration: $duration');
 
       mediaItem.add(MediaItem(
-        id: file.path,
+        id: path,
         title: title,
         artist: artist,
         duration: duration,
       ));
 
       await _player.play();
-      _currentSongPath = file.path;
+      _currentSongPath = path;
       print('✅ Playing: $title');
       
     } catch (e) {
-      print('❌ Error playing file: $e');
+      print('❌ Error: $e');
       rethrow;
     }
   }
 
-  @override Future<void> play() async {
+  // 🔥 KEEP BACKWARD COMPATIBILITY
+  Future<void> playSong(String path, String title, String artist) async {
+    final uri = Uri.file(path);
+    await playFromUri(uri, extras: {
+      'title': title,
+      'artist': artist,
+    });
+  }
+
+  @override 
+  Future<void> play() async {
     print('▶️ Play called');
     if (_player.processingState == ProcessingState.completed) {
       await _player.seek(Duration.zero);
     }
     await _player.play();
-    playbackState.add(playbackState.value.copyWith(playing: true));
+    // 🔥 Update playback state with controls
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: true,
+        controls: [
+          MediaControl.skipToPrevious,
+          MediaControl.pause,
+          MediaControl.stop,
+          MediaControl.skipToNext,
+        ],
+      ),
+    );
   }
   
-  @override Future<void> pause() async {
+  @override 
+  Future<void> pause() async {
     print('⏸️ Pause called');
     await _player.pause();
-    playbackState.add(playbackState.value.copyWith(playing: false));
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: false,
+        controls: [
+          MediaControl.skipToPrevious,
+          MediaControl.play,
+          MediaControl.stop,
+          MediaControl.skipToNext,
+        ],
+      ),
+    );
   }
   
-  @override Future<void> stop() async {
+  @override 
+  Future<void> stop() async {
     print('⏹️ Stop called');
     await _player.stop();
     _currentSongPath = null;
-    playbackState.add(playbackState.value.copyWith(playing: false));
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: false,
+        controls: [
+          MediaControl.skipToPrevious,
+          MediaControl.play,
+          MediaControl.stop,
+          MediaControl.skipToNext,
+        ],
+      ),
+    );
     await super.stop();
   }
   
-  @override Future<void> seek(Duration p) async => _player.seek(p);
-  @override Future<void> setVolume(double v) async => _player.setVolume(v);
-  @override Future<void> setSpeed(double s) async => _player.setSpeed(s);
+  @override 
+  Future<void> seek(Duration p) async => _player.seek(p);
+  
+  @override 
+  Future<void> setVolume(double v) async => _player.setVolume(v);
+  
+  @override 
+  Future<void> setSpeed(double s) async => _player.setSpeed(s);
   
   @override Future<void> skipToNext() async {}
   @override Future<void> skipToPrevious() async {}
