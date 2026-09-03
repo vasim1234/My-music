@@ -104,16 +104,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return _albumGradients[index % _albumGradients.length];
   }
 
-  String _cleanSongName(String fileName) {
-    String name = fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
-    name = name.replaceAll(RegExp(r'\(\w*_\d+K\)', caseSensitive: false), '');
-    name = name.replaceAll(RegExp(r'\(\d+K\)', caseSensitive: false), '');
-    name = name.replaceAll(RegExp(r'\(MP3_\d+K\)', caseSensitive: false), '');
-    name = name.trim();
-    if (name.length > 35) {
-      name = '${name.substring(0, 35)}...';
-    }
-    return name;
+  String _formatDuration(Duration duration) {
+  String twoDigits(int n) => n.toString().padLeft(2, '0');
+  final minutes = twoDigits(duration.inMinutes.remainder(60));
+  final seconds = twoDigits(duration.inSeconds.remainder(60));
+  return '$minutes:$seconds';
   }
 
   // ============================================================
@@ -288,39 +283,93 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   Future<void> _playCurrentSongInQueue() async {
-    if (_playlist.isEmpty) return;
+  if (_playlist.isEmpty) {
+    print('⚠️ Playlist is empty');
+    return;
+  }
+  
+  try {
+    final currentFile = _playlist[_currentIndex];
+    String cleanName = _cleanSongName(currentFile.name);
+    print('🎵 Playing: $cleanName');
+    print('📁 Path: ${currentFile.path}');
     
-    try {
-      final currentFile = _playlist[_currentIndex];
-      String cleanName = _cleanSongName(currentFile.name);
-      print('🎵 Playing: $cleanName');
-      
-      if (currentFile.path == null) return;
-      
-      final file = File(currentFile.path!);
-      if (!await file.exists()) {
-        print('❌ File not found');
-        return;
-      }
-      
-      if (audioHandler == null) {
-        await _initAudioService();
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-      
-      if (audioHandler is MyAudioHandler) {
-        final handler = audioHandler as MyAudioHandler;
-        await handler.playSong(currentFile.path!, cleanName, 'Luna Echo');
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) {
-          setState(() => isPlaying = true);
-          _saveData();
-          print('✅ Song playing: $cleanName');
-        }
-      }
-    } catch (e) {
-      print('❌ Error playing song: $e');
+    if (currentFile.path == null) {
+      print('❌ Path is null');
+      return;
     }
+    
+    // 🔥 FILE CHECK
+    final file = File(currentFile.path!);
+    if (!await file.exists()) {
+      print('❌ File not found: ${currentFile.path}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ File not found: ${file.path.split('/').last}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    print('✅ File exists: ${file.lengthSync()} bytes');
+
+    // 🔥 UPDATE RECENT
+    if (!_recent.contains(currentFile)) {
+      _recent.insert(0, currentFile);
+      if (_recent.length > 50) _recent.removeLast();
+      _saveData();
+    }
+
+    // 🔥 INIT AUDIO SERVICE
+    if (audioHandler == null) {
+      print('⚠️ audioHandler is null, initializing...');
+      await _initAudioService();
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (audioHandler is MyAudioHandler) {
+      print('✅ audioHandler is MyAudioHandler');
+      
+      final handler = audioHandler as MyAudioHandler;
+      
+      // 🔥 PLAY SONG
+      await handler.playSong(
+        currentFile.path!,
+        cleanName,
+        'Luna Echo',
+      );
+      
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      if (mounted) {
+        setState(() {
+          isPlaying = true;
+        });
+        _saveData();
+        print('✅ Song playing: $cleanName');
+        
+        // 🔥 SHOW SUCCESS
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('▶️ Playing: $cleanName'),
+            backgroundColor: Colors.green.withOpacity(0.7),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      print('❌ audioHandler is not MyAudioHandler');
+    }
+  } catch (e) {
+    print('❌ Error playing song: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('❌ Error: $e'),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
   }
 
   Future<void> _playNextSong() async {
