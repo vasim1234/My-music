@@ -45,6 +45,12 @@ class MyAudioHandler extends BaseAudioHandler {
           processingState: _getAudioProcessingState(state.processingState),
         ),
       );
+      
+      // 🔥 Track completion for auto-next
+      if (state.processingState == ProcessingState.completed) {
+        print('🎵 Song completed - auto-next trigger');
+        // Auto-next will be handled by callback
+      }
     });
   }
 
@@ -59,13 +65,12 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  // 🔥 SIMPLIFIED PLAY SONG
+  // 🔥 PLAY SONG
   Future<void> playSong(String path, String title, String artist) async {
     try {
       print('🎵 playSong: $title');
       print('📁 Path: $path');
       
-      // 🔥 CHECK FILE
       final file = File(path);
       if (!await file.exists()) {
         print('❌ File not found');
@@ -73,17 +78,14 @@ class MyAudioHandler extends BaseAudioHandler {
       }
       print('✅ File exists');
 
-      // 🔥 STOP AND LOAD
       await _player.stop();
       await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       print('✅ Audio source set');
 
-      // 🔥 GET DURATION
       await Future.delayed(const Duration(milliseconds: 200));
       final duration = _player.duration;
       print('⏱️ Duration: $duration');
 
-      // 🔥 UPDATE MEDIA ITEM
       mediaItem.add(MediaItem(
         id: path,
         title: title,
@@ -91,7 +93,6 @@ class MyAudioHandler extends BaseAudioHandler {
         duration: duration,
       ));
 
-      // 🔥 PLAY
       await _player.play();
       _currentSongPath = path;
       print('✅ Playing: $title');
@@ -102,19 +103,33 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  @override Future<void> play() async {
+  // 🔥 PLAY - FIXED: Completed state handle
+  @override 
+  Future<void> play() async {
     print('▶️ Play called');
+    print('📊 Processing state: ${_player.processingState}');
+    print('📊 Position: ${_player.position}');
+    
+    // 🔥 CRITICAL: Agar gaana khatam ho chuka hai, toh wapas shuru se play karo
+    if (_player.processingState == ProcessingState.completed) {
+      print('🔄 Song completed, seeking to start...');
+      await _player.seek(Duration.zero);
+    }
+    
     await _player.play();
     playbackState.add(playbackState.value.copyWith(playing: true));
+    print('✅ Play command executed');
   }
   
-  @override Future<void> pause() async {
+  @override 
+  Future<void> pause() async {
     print('⏸️ Pause called');
     await _player.pause();
     playbackState.add(playbackState.value.copyWith(playing: false));
   }
   
-  @override Future<void> stop() async {
+  @override 
+  Future<void> stop() async {
     print('⏹️ Stop called');
     await _player.stop();
     _currentSongPath = null;
@@ -122,9 +137,14 @@ class MyAudioHandler extends BaseAudioHandler {
     await super.stop();
   }
   
-  @override Future<void> seek(Duration p) async => _player.seek(p);
-  @override Future<void> setVolume(double v) async => _player.setVolume(v);
-  @override Future<void> setSpeed(double s) async => _player.setSpeed(s);
+  @override 
+  Future<void> seek(Duration p) async => _player.seek(p);
+  
+  @override 
+  Future<void> setVolume(double v) async => _player.setVolume(v);
+  
+  @override 
+  Future<void> setSpeed(double s) async => _player.setSpeed(s);
   
   @override Future<void> skipToNext() async {}
   @override Future<void> skipToPrevious() async {}
