@@ -92,7 +92,7 @@ Future<void> playFromUri(Uri uri, [Map<String, dynamic>? extras]) async {
       print('✅ File exists: ${file.lengthSync()} bytes');
 
       await _player.stop();
-      await _player.setAudioSource(AudioSource.uri(uri));
+      await _player.setAudioSource(AudioSource.file(path));
       print('✅ Audio source set');
 
       await Future.delayed(const Duration(milliseconds: 200));
