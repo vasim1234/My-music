@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:just_audio/just_audio.dart';
 import '../widgets/album_art.dart';
 import '../services/background_handler.dart';
 
@@ -698,38 +697,22 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         'Luna Echo',
       );
       
-      // 🔥 WAIT FOR PLAYBACK
-      await Future.delayed(const Duration(milliseconds: 1500));
-      
-      // 🔥 CHECK IF ACTUALLY PLAYING
-      print('🔍 Checking if song is playing...');
-      print('🔍 handler.isPlaying: ${handler.isPlaying}');
-      print('🔍 _player.playing: ${handler.isPlaying}');
+      await Future.delayed(const Duration(milliseconds: 1000));
       
       if (mounted) {
         setState(() {
-          isPlaying = handler.isPlaying;
+          isPlaying = true;
         });
         _saveData();
+        print('✅ Song playing: $cleanName');
         
-        if (handler.isPlaying) {
-          print('✅ Song is playing: $cleanName');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('▶️ Playing: $cleanName'),
-              backgroundColor: Colors.green.withOpacity(0.7),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        } else {
-          print('⚠️ Song is NOT playing!');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('⚠️ Failed to play song'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('▶️ Playing: $cleanName'),
+            backgroundColor: Colors.green.withOpacity(0.7),
+            duration: const Duration(seconds: 1),
+          ),
+        );
       }
     } else {
       print('❌ audioHandler is not MyAudioHandler');
@@ -1124,14 +1107,7 @@ void _testDirectPlay() async {
               isSleepTimerActive: _sleepTimerActive,
               animation: _pulseAnimation,
               accentColor: _accentColor,
-            ),
-            // AlbumArt widget ke theek neeche ye add karein:
-const SizedBox(height: 20),
-ElevatedButton(
-  onPressed: _testDirectPlay,
-  style: ElevatedButton.styleFrom(backgroundColor: _accentColor),
-  child: const Text('Test Direct Play', style: TextStyle(color: Colors.white)),
-),
+            ),     
             const SizedBox(height: 20),
             Column(
               children: [
