@@ -1,85 +1,39 @@
-import 'dart:async';
-import 'dart:io';
-import 'package:just_audio/just_audio.dart';
 import 'package:flutter/material.dart';
+import 'screens/player_screen.dart';
 
-class AudioPlayerManager {
-  static final AudioPlayerManager _instance = AudioPlayerManager._internal();
-  factory AudioPlayerManager() => _instance;
-  AudioPlayerManager._internal();
+void main() {
+  runApp(const MyMusicApp());
+}
 
-  final AudioPlayer _player = AudioPlayer();
-  String? _currentSongPath;
-  bool _isPlaying = false;
+class MyMusicApp extends StatelessWidget {
+  const MyMusicApp({super.key});
 
-  // Streams
-  Stream<Duration> get positionStream => _player.positionStream;
-  Stream<Duration?> get durationStream => _player.durationStream;
-  
-  bool get isPlaying => _isPlaying;
-  String? get currentSong => _currentSongPath;
-
-  void init() {
-    _player.playerStateStream.listen((state) {
-      _isPlaying = state.playing;
-      print('🎵 State: ${state.processingState}, playing: ${state.playing}');
-    });
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'My Music 3D',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0A0A0F),
+        primaryColor: const Color(0xFF6C63FF),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF6C63FF),
+          secondary: Color(0xFF4ECDC4),
+          surface: Color(0xFF16161E),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      home: const PlayerScreen(),
+    );
   }
-
-  Future<void> playSong(String path, String title, String artist) async {
-    try {
-      print('🎵 playSong: $title');
-      print('📁 Path: $path');
-      
-      final file = File(path);
-      if (!await file.exists()) {
-        print('❌ File not found');
-        throw Exception('File not found');
-      }
-      print('✅ File exists: ${file.lengthSync()} bytes');
-
-      await _player.stop();
-      await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
-      print('✅ Audio source set');
-
-      await Future.delayed(const Duration(milliseconds: 300));
-      final duration = _player.duration;
-      print('⏱️ Duration: $duration');
-
-      await _player.play();
-      _currentSongPath = path;
-      _isPlaying = true;
-      print('✅ Playing: $title');
-      
-    } catch (e) {
-      print('❌ Error: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> play() async {
-    print('▶️ Play called');
-    if (_player.processingState == ProcessingState.completed) {
-      await _player.seek(Duration.zero);
-    }
-    await _player.play();
-    _isPlaying = true;
-  }
-
-  Future<void> pause() async {
-    print('⏸️ Pause called');
-    await _player.pause();
-    _isPlaying = false;
-  }
-
-  Future<void> stop() async {
-    print('⏹️ Stop called');
-    await _player.stop();
-    _currentSongPath = null;
-    _isPlaying = false;
-  }
-
-  Future<void> seek(Duration p) async => _player.seek(p);
-  Future<void> setVolume(double v) async => _player.setVolume(v);
-  Future<void> dispose() async => _player.dispose();
 }
