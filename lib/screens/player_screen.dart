@@ -658,7 +658,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       return;
     }
     
-    // 🔥 FILE CHECK
     final file = File(currentFile.path!);
     if (!await file.exists()) {
       print('❌ File not found: ${currentFile.path}');
@@ -672,14 +671,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
     print('✅ File exists: ${file.lengthSync()} bytes');
 
-    // 🔥 UPDATE RECENT
     if (!_recent.contains(currentFile)) {
       _recent.insert(0, currentFile);
       if (_recent.length > 50) _recent.removeLast();
       _saveData();
     }
 
-    // 🔥 INIT AUDIO SERVICE
     if (audioHandler == null) {
       print('⚠️ audioHandler is null, initializing...');
       await _initAudioService();
@@ -691,14 +688,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       
       final handler = audioHandler as MyAudioHandler;
       
-      // 🔥 PLAY SONG
       await handler.playSong(
         currentFile.path!,
         cleanName,
         'Luna Echo',
       );
       
-      // 🔥 UPDATE UI
       await Future.delayed(const Duration(milliseconds: 500));
       
       if (mounted) {
@@ -718,7 +713,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       }
     } else {
       print('❌ audioHandler is not MyAudioHandler');
-      print('🔍 Type: ${audioHandler.runtimeType}');
     }
   } catch (e) {
     print('❌ Error playing song: $e');
@@ -774,17 +768,24 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       });
     } else {
       print('▶️ Playing...');
-      // 🔥 If no song is loaded, play current
-      if (_playlist.isNotEmpty && audioHandler is MyAudioHandler) {
+      
+      if (audioHandler is MyAudioHandler) {
         final handler = audioHandler as MyAudioHandler;
+        
+        // 🔥 Check if song is loaded
         if (handler.currentSong == null) {
+          // No song loaded - play from queue
+          print('🔄 No song loaded, playing from queue...');
           await _playCurrentSongInQueue();
         } else {
+          // Song exists - play it (handler will handle completed state)
+          print('🔄 Resuming existing song...');
           await audioHandler?.play();
         }
       } else {
         await _playCurrentSongInQueue();
       }
+      
       setState(() {
         isPlaying = true;
       });
