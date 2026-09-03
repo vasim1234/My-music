@@ -181,8 +181,8 @@ class AudioManagerExtended extends ChangeNotifier {
   
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<Duration>? _durationSubscription;
-  StreamSubscription? _completionSubscription;
-
+  // Removed completionStream as it doesn't exist in AudioManager
+  
   PlaybackStatus get status => _status;
   Song? get currentSong => _currentSong;
   Duration get position => _position;
@@ -204,7 +204,8 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    await _audioManager.init();
+    // AudioManager.init() returns void, not Future
+    _audioManager.init();
     _setupStreams();
     _loadSavedData();
   }
@@ -224,8 +225,12 @@ class AudioManagerExtended extends ChangeNotifier {
       }
     });
 
-    _completionSubscription = _audioManager.completionStream.listen((_) {
-      _onSongComplete();
+    // Listen for playback completion using position listener
+    // Check if position reaches duration
+    _positionSubscription?.onData((position) {
+      if (_duration > Duration.zero && position >= _duration) {
+        _onSongComplete();
+      }
     });
   }
 
@@ -259,6 +264,7 @@ class AudioManagerExtended extends ChangeNotifier {
 
     try {
       _currentSong = song;
+      // AudioManager.playSong returns Future<void>
       await _audioManager.playSong(song.path, song.displayName, song.artist);
       _status = PlaybackStatus.playing;
       
@@ -498,7 +504,6 @@ class AudioManagerExtended extends ChangeNotifier {
   void dispose() {
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
-    _completionSubscription?.cancel();
     _audioManager.dispose();
     super.dispose();
   }
