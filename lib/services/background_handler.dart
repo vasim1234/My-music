@@ -2,9 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
-
-// 🔥 IMPORTANT: VoidCallback ke liye
-// VoidCallback Flutter ka part hai, isliye flutter/material.dart import karo
 import 'package:flutter/material.dart';
 
 AudioHandler? audioHandler;
@@ -14,7 +11,7 @@ class MyAudioHandler extends BaseAudioHandler {
   bool _isPlayerReady = false;
   String? _currentSongPath;
   
-  // 🔥 Callback for next song
+  // Callback for next song
   VoidCallback? onSongComplete;
   
   // Streams expose
@@ -88,6 +85,14 @@ class MyAudioHandler extends BaseAudioHandler {
         _onSongComplete();
       }
     });
+
+    // 🔥 ERROR HANDLER
+    _player.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.idle && 
+          state.playing == false) {
+        print('⚠️ Player is idle');
+      }
+    });
   }
 
   AudioProcessingState _getAudioProcessingState(ProcessingState state) {
@@ -108,13 +113,12 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 
   void _onSongComplete() {
-    // Call the callback if set
     if (onSongComplete != null) {
       onSongComplete!();
     }
   }
 
-  // 🔥 MAIN PLAY SONG METHOD
+  // 🔥 MAIN PLAY SONG METHOD - SIMPLIFIED
   Future<void> playSong(String path, String title, String artist) async {
     try {
       print('🎵 playSong called: $title');
@@ -124,19 +128,25 @@ class MyAudioHandler extends BaseAudioHandler {
       await _player.stop();
       _isPlayerReady = false;
       
-      // 🔥 CHECK FILE
+      // 🔥 CHECK FILE - CRITICAL
       final file = File(path);
       if (!await file.exists()) {
+        print('❌ File not found: $path');
         throw Exception('File not found: $path');
       }
       print('✅ File exists: ${file.lengthSync()} bytes');
 
-      // 🔥 SET AUDIO SOURCE
+      // 🔥 SET AUDIO SOURCE - CRITICAL
       print('📁 Loading audio source...');
-      await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
-      print('✅ Audio source set');
+      try {
+        await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
+        print('✅ Audio source set successfully');
+      } catch (e) {
+        print('❌ Error setting audio source: $e');
+        rethrow;
+      }
 
-      // 🔥 WAIT FOR DURATION
+      // 🔥 WAIT FOR DURATION - CRITICAL
       print('⏳ Waiting for duration...');
       int attempts = 0;
       Duration? duration;
@@ -148,8 +158,15 @@ class MyAudioHandler extends BaseAudioHandler {
       }
       
       print('⏱️ Duration loaded: $duration');
+
+      // 🔥 START PLAYING - CRITICAL
+      print('▶️ Starting playback...');
+      await _player.play();
       
-      // 🔥 UPDATE MEDIA ITEM WITH DURATION
+      _currentSongPath = path;
+      _isPlayerReady = true;
+      
+      // 🔥 UPDATE UI
       final mediaItem = MediaItem(
         id: path,
         title: title,
@@ -158,14 +175,6 @@ class MyAudioHandler extends BaseAudioHandler {
         artUri: _getArtUri(path),
       );
       this.mediaItem.add(mediaItem);
-      print('✅ Media item updated with duration: $duration');
-
-      // 🔥 START PLAYING
-      print('▶️ Starting playback...');
-      await _player.play();
-      
-      _currentSongPath = path;
-      _isPlayerReady = true;
       
       playbackState.add(
         playbackState.value.copyWith(
@@ -175,6 +184,8 @@ class MyAudioHandler extends BaseAudioHandler {
       );
       
       print('✅ Song playing successfully: $title');
+      print('✅ Duration: $duration');
+      print('✅ Position: ${_player.position}');
       
     } catch (e, stacktrace) {
       print('❌ Error in playSong: $e');
@@ -189,6 +200,20 @@ class MyAudioHandler extends BaseAudioHandler {
       return Uri.file(artFile.path);
     }
     return Uri.parse('asset:///assets/icon/icon.png');
+  }
+
+  // 🔥 RESET PLAYER
+  Future<void> resetPlayer() async {
+    print('🔄 Resetting player...');
+    await _player.stop();
+    _isPlayerReady = false;
+    _currentSongPath = null;
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: false,
+        processingState: AudioProcessingState.idle,
+      ),
+    );
   }
 
   // 🔥 OVERRIDE METHODS
