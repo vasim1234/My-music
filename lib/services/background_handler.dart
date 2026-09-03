@@ -9,6 +9,7 @@ AudioHandler? audioHandler;
 class MyAudioHandler extends BaseAudioHandler {
   final AudioPlayer _player = AudioPlayer();
   String? _currentSongPath;
+  bool _isLoading = false;
   
   // Streams
   Stream<Duration> get positionStream => _player.positionStream;
@@ -24,7 +25,7 @@ class MyAudioHandler extends BaseAudioHandler {
 
   void _init() {
     _player.durationStream.listen((duration) {
-      print('⏱️ Duration received: $duration');
+      print('⏱️ Duration: $duration');
       if (duration != null) {
         final current = mediaItem.value;
         if (current != null) {
@@ -34,7 +35,7 @@ class MyAudioHandler extends BaseAudioHandler {
     });
 
     _player.positionStream.listen((position) {
-      print('📍 Position: ${position.inSeconds} seconds');
+      print('📍 Position: ${position.inSeconds}s');
     });
 
     _player.playerStateStream.listen((state) {
@@ -47,7 +48,6 @@ class MyAudioHandler extends BaseAudioHandler {
         ),
       );
       
-      // 🔥 CRITICAL: When player is ready, update duration
       if (state.processingState == ProcessingState.ready) {
         final duration = _player.duration;
         if (duration != null && duration > Duration.zero) {
@@ -57,6 +57,17 @@ class MyAudioHandler extends BaseAudioHandler {
             mediaItem.add(current.copyWith(duration: duration));
           }
         }
+        _isLoading = false;
+      }
+      
+      if (state.processingState == ProcessingState.completed) {
+        print('🎵 Song completed');
+        _isLoading = false;
+      }
+      
+      if (state.processingState == ProcessingState.idle) {
+        _currentSongPath = null;
+        _isLoading = false;
       }
     });
   }
@@ -72,30 +83,37 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  // 🔥 MAIN PLAY SONG - SIMPLIFIED & FIXED
+  // 🔥 MAIN PLAY SONG - FIXED
   Future<void> playSong(String path, String title, String artist) async {
     try {
+      if (_isLoading) {
+        print('⏳ Already loading, waiting...');
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (_isLoading) return;
+      }
+      
+      _isLoading = true;
       print('🎵 playSong: $title');
       print('📁 Path: $path');
+      
+      // 🔥 STOP OLD PLAYER COMPLETELY
+      await _player.stop();
+      await Future.delayed(const Duration(milliseconds: 100));
       
       // 🔥 CHECK FILE
       final file = File(path);
       if (!await file.exists()) {
-        print('❌ File not found');
+        _isLoading = false;
         throw Exception('File not found');
       }
       print('✅ File exists: ${file.lengthSync()} bytes');
 
-      // 🔥 STOP OLD
-      await _player.stop();
-      print('🛑 Stopped old player');
-
-      // 🔥 LOAD AUDIO
+      // 🔥 LOAD NEW AUDIO
       await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       print('✅ Audio source set');
 
       // 🔥 WAIT FOR LOADING
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 300));
       
       // 🔥 GET DURATION
       final duration = _player.duration;
@@ -110,28 +128,24 @@ class MyAudioHandler extends BaseAudioHandler {
       ));
       print('✅ Media item updated');
 
-      // 🔥 PLAY - CRITICAL
+      // 🔥 PLAY
       await _player.play();
       _currentSongPath = path;
       print('▶️ Play command sent');
       
-      // 🔥 VERIFY PLAYBACK
       await Future.delayed(const Duration(milliseconds: 500));
       
       if (_player.playing) {
         print('✅ Song is playing!');
       } else {
-        print('⚠️ Song not playing, trying again...');
+        print('⚠️ Song not playing, retry...');
         await _player.play();
-        await Future.delayed(const Duration(milliseconds: 300));
-        if (_player.playing) {
-          print('✅ Song is playing after retry!');
-        } else {
-          print('❌ Still not playing');
-        }
       }
       
+      _isLoading = false;
+      
     } catch (e) {
+      _isLoading = false;
       print('❌ Error: $e');
       rethrow;
     }
@@ -153,11 +167,17 @@ class MyAudioHandler extends BaseAudioHandler {
     print('⏹️ Stop called');
     await _player.stop();
     _currentSongPath = null;
+    _isLoading = false;
     playbackState.add(playbackState.value.copyWith(playing: false));
     await super.stop();
   }
   
-  @override Future<void> seek(Duration p) async => _player.seek(p);
+  @override Future<void> seek(Duration p) async {
+    if (_player.playing || _player.processingState == ProcessingState.ready) {
+      await _player.seek(p);
+    }
+  }
+  
   @override Future<void> setVolume(double v) async => _player.setVolume(v);
   @override Future<void> setSpeed(double s) async => _player.setSpeed(s);
   
