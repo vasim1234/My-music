@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.music.app.my_music">  <!-- ← YEH HONA CHAHIYE -->
+    package="com.music.app.my_music">
     
     <!-- Permissions -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -32,9 +32,11 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>     
-        <!-- Audio Service & Background Playback ke liye ye add karna zaruri hai -->
-        <service android:name="com.ryanheise.audioservice.AudioService"
+        </activity>
+        
+        <!-- Audio Service for Background Playback -->
+        <service
+            android:name="com.ryanheise.audioservice.AudioService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="true">
             <intent-filter>
@@ -42,7 +44,9 @@
             </intent-filter>
         </service>
 
-        <receiver android:name="androidx.media.session.MediaButtonReceiver"
+        <!-- Media Button Receiver -->
+        <receiver
+            android:name="androidx.media.session.MediaButtonReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
