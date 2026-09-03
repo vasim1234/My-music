@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 AudioHandler? audioHandler;
 
@@ -37,11 +36,9 @@ class MyAudioHandler extends BaseAudioHandler {
       print('📍 Position: ${position.inSeconds}s');
     });
 
-    // 🔥 FIX: Complete playerStateStream with controls
     _player.playerStateStream.listen((state) {
       print('🎵 State: ${state.processingState}, playing: ${state.playing}');
       
-      // 🔥 CRITICAL: Add controls for background notification
       playbackState.add(
         playbackState.value.copyWith(
           controls: [
@@ -73,29 +70,24 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  // 🔥 FIX: Override playFromUri
-  @override
-Future<void> playFromUri(Uri uri, [Map<String, dynamic>? extras]) async {
+  // 🔥 SIMPLE PLAY SONG - DIRECT METHOD
+  Future<void> playSong(String path, String title, String artist) async {
     try {
-      final path = uri.toFilePath();
-      final title = extras?['title'] ?? 'Unknown Song';
-      final artist = extras?['artist'] ?? 'Unknown Artist';
-      
-      print('🎵 playFromUri: $title');
+      print('🎵 playSong: $title');
       print('📁 Path: $path');
       
       final file = File(path);
       if (!await file.exists()) {
-        print('❌ File not found: $path');
+        print('❌ File not found');
         throw Exception('File not found');
       }
       print('✅ File exists: ${file.lengthSync()} bytes');
 
       await _player.stop();
-      await _player.setAudioSource(AudioSource.file(path));
+      await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       print('✅ Audio source set');
 
-      await Future.delayed(const Duration(milliseconds: 200));
+      await Future.delayed(const Duration(milliseconds: 300));
       final duration = _player.duration;
       print('⏱️ Duration: $duration');
 
@@ -116,15 +108,6 @@ Future<void> playFromUri(Uri uri, [Map<String, dynamic>? extras]) async {
     }
   }
 
-  // 🔥 KEEP BACKWARD COMPATIBILITY
-  Future<void> playSong(String path, String title, String artist) async {
-    final uri = Uri.file(path);
-    await playFromUri(uri, {
-      'title': title,
-      'artist': artist,
-    });
-  }
-
   @override 
   Future<void> play() async {
     print('▶️ Play called');
@@ -132,35 +115,14 @@ Future<void> playFromUri(Uri uri, [Map<String, dynamic>? extras]) async {
       await _player.seek(Duration.zero);
     }
     await _player.play();
-    // 🔥 Update playback state with controls
-    playbackState.add(
-      playbackState.value.copyWith(
-        playing: true,
-        controls: [
-          MediaControl.skipToPrevious,
-          MediaControl.pause,
-          MediaControl.stop,
-          MediaControl.skipToNext,
-        ],
-      ),
-    );
+    playbackState.add(playbackState.value.copyWith(playing: true));
   }
   
   @override 
   Future<void> pause() async {
     print('⏸️ Pause called');
     await _player.pause();
-    playbackState.add(
-      playbackState.value.copyWith(
-        playing: false,
-        controls: [
-          MediaControl.skipToPrevious,
-          MediaControl.play,
-          MediaControl.stop,
-          MediaControl.skipToNext,
-        ],
-      ),
-    );
+    playbackState.add(playbackState.value.copyWith(playing: false));
   }
   
   @override 
@@ -168,17 +130,7 @@ Future<void> playFromUri(Uri uri, [Map<String, dynamic>? extras]) async {
     print('⏹️ Stop called');
     await _player.stop();
     _currentSongPath = null;
-    playbackState.add(
-      playbackState.value.copyWith(
-        playing: false,
-        controls: [
-          MediaControl.skipToPrevious,
-          MediaControl.play,
-          MediaControl.stop,
-          MediaControl.skipToNext,
-        ],
-      ),
-    );
+    playbackState.add(playbackState.value.copyWith(playing: false));
     await super.stop();
   }
   
