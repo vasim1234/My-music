@@ -1154,17 +1154,17 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       await Future.delayed(const Duration(milliseconds: 500));
     }
 
-    // 🔥 FIX: Use playFromUri directly
-    if (audioHandler != null) {
-      print('✅ Playing via playFromUri');
+    // 🔥 DIRECTLY CALL playSong METHOD
+    if (audioHandler is MyAudioHandler) {
+      print('✅ Calling playSong directly');
       
-      await audioHandler!.playFromUri(
-  Uri.file(currentFile.path!),
-  {
-    'title': cleanName,
-    'artist': 'Luna Echo',
-  }
-);
+      final handler = audioHandler as MyAudioHandler;
+      
+      await handler.playSong(
+        currentFile.path!,
+        cleanName,
+        'Luna Echo',
+      );
       
       await Future.delayed(const Duration(milliseconds: 500));
       
@@ -1174,9 +1174,18 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         });
         _saveData();
         print('✅ Song playing: $cleanName');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('▶️ $cleanName'),
+            backgroundColor: Colors.green.withOpacity(0.7),
+            duration: const Duration(seconds: 1),
+          ),
+        );
       }
     } else {
-      print('❌ audioHandler is null');
+      print('❌ audioHandler is not MyAudioHandler');
+      print('🔍 Type: ${audioHandler.runtimeType}');
     }
   } catch (e) {
     print('❌ Error playing song: $e');
