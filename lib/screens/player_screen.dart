@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/album_art.dart';
-import '../services/background_handler.dart';
+import '../services/audio_manager.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -15,7 +15,7 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
-  final AudioPlayerManager _audioManager = AudioPlayerManager();
+  final AudioManager _audioManager = AudioManager();
   
   int _selectedIndex = 0;
   bool isPlaying = false;
@@ -45,7 +45,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   Map<String, List<PlatformFile>> _customPlaylists = {};
   String _newPlaylistName = '';
 
-  // Equalizer
   bool _isEqActive = false;
   String _currentEqPreset = 'Normal';
   final List<String> _bandLabels = ['Bass', 'Mid', 'Treble'];
@@ -565,7 +564,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
-  // 🔥 PLAY CURRENT SONG
   Future<void> _playCurrentSongInQueue() async {
     if (_playlist.isEmpty) {
       print('⚠️ Playlist is empty');
@@ -602,7 +600,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _saveData();
       }
 
-      // 🔥 DIRECT PLAY
       await _audioManager.playSong(
         currentFile.path!,
         cleanName,
@@ -698,7 +695,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     await _playCurrentSongInQueue();
   }
 
-  // 🔥 TOGGLE PLAY PAUSE
   Future<void> _togglePlayPause() async {
     if (_playlist.isEmpty) {
       await _pickSongs();
@@ -750,7 +746,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // SONG POPUP - LONG PRESS
+  // SONG POPUP
   // ============================================================
   void _showSongPopup(PlatformFile song, {List<PlatformFile>? playlist}) {
     String cleanName = _cleanSongName(song.name);
@@ -920,7 +916,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // SONG LIST ITEM WITH LONG PRESS
+  // SONG LIST ITEM
   // ============================================================
   Widget _buildSongListItem(PlatformFile song, int index, {List<PlatformFile>? playlist}) {
     String cleanName = _cleanSongName(song.name);
@@ -983,395 +979,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         onLongPress: () => _showSongPopup(song, playlist: playlist),
         onTap: () => _playSpecificSong(song, playlist: playlist),
       ),
-    );
-  }
-
-  // ============================================================
-  // SHUFFLE/REPEAT MENU
-  // ============================================================
-  void _showShuffleRepeatMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: _bgColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          height: 280,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: _primaryGradient),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.repeat, color: Colors.white, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('Playback Mode', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _buildMenuOption(
-                icon: Icons.shuffle,
-                title: 'Shuffle',
-                subtitle: 'Play songs in random order',
-                isActive: isShuffle,
-                onTap: () {
-                  setState(() { isShuffle = true; repeatMode = 0; });
-                  _saveData();
-                  Navigator.pop(context);
-                },
-              ),
-              const Divider(color: Colors.white24),
-              _buildMenuOption(
-                icon: Icons.repeat_outlined,
-                title: 'Repeat Off',
-                subtitle: 'Stop after current song',
-                isActive: repeatMode == 0 && !isShuffle,
-                onTap: () {
-                  setState(() { isShuffle = false; repeatMode = 0; });
-                  _saveData();
-                  Navigator.pop(context);
-                },
-              ),
-              const Divider(color: Colors.white24),
-              _buildMenuOption(
-                icon: Icons.repeat_one,
-                title: 'Repeat One',
-                subtitle: 'Repeat current song',
-                isActive: repeatMode == 1,
-                onTap: () {
-                  setState(() { isShuffle = false; repeatMode = 1; });
-                  _saveData();
-                  Navigator.pop(context);
-                },
-              ),
-              const Divider(color: Colors.white24),
-              _buildMenuOption(
-                icon: Icons.repeat,
-                title: 'Repeat All',
-                subtitle: 'Repeat entire queue',
-                isActive: repeatMode == 2,
-                onTap: () {
-                  setState(() { isShuffle = false; repeatMode = 2; });
-                  _saveData();
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildMenuOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: isActive ? LinearGradient(colors: _primaryGradient) : null,
-                color: isActive ? null : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: isActive ? Colors.white : Colors.white54, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: isActive ? _accentColor : Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
-                  Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                ],
-              ),
-            ),
-            if (isActive) Icon(Icons.check_circle, color: _accentColor, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // BODY CONTENT
-  // ============================================================
-  Widget _buildBodyContent() {
-    if (_selectedIndex == 1) {
-      return _buildFavoritesTab();
-    } else if (_selectedIndex == 2) {
-      return _buildRecentTab();
-    } else if (_selectedIndex == 3) {
-      return _buildPlaylistsTab();
-    }
-    return _buildPlayerUI();
-  }
-
-  // ============================================================
-  // FAVORITES TAB
-  // ============================================================
-  Widget _buildFavoritesTab() {
-    if (_favorites.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.favorite_border, size: 64, color: Colors.white24),
-            const SizedBox(height: 16),
-            const Text('No favorites yet', style: TextStyle(color: Colors.white54, fontSize: 16)),
-          ],
-        ),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _favorites.length,
-      itemBuilder: (context, index) {
-        final song = _favorites[index];
-        return _buildSongListItem(song, index);
-      },
-    );
-  }
-
-  // ============================================================
-  // RECENT TAB
-  // ============================================================
-  Widget _buildRecentTab() {
-    if (_recent.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history, size: 64, color: Colors.white24),
-            const SizedBox(height: 16),
-            const Text('No recent songs', style: TextStyle(color: Colors.white54, fontSize: 16)),
-          ],
-        ),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _recent.length,
-      itemBuilder: (context, index) {
-        final song = _recent[index];
-        return _buildSongListItem(song, index);
-      },
-    );
-  }
-
-  // ============================================================
-  // PLAYLISTS TAB
-  // ============================================================
-  Widget _buildPlaylistsTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: _primaryGradient),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ElevatedButton.icon(
-              onPressed: _showCreatePlaylistDialog,
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text('Create New Playlist', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                foregroundColor: Colors.white,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                minimumSize: const Size(double.infinity, 50),
-              ),
-            ),
-          ),
-        ),
-        
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _customPlaylists.keys.length + 1,
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return Card(
-                  color: _cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ExpansionTile(
-                    title: Row(
-                      children: [
-                        const Icon(Icons.music_note, color: Color(0xFF6C63FF), size: 20),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'All Songs',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Text(
-                      '${_masterList.length} songs',
-                      style: TextStyle(color: _textSecondary),
-                    ),
-                    leading: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF6C63FF), Color(0xFF3F3D9E)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.library_music, color: Colors.white),
-                    ),
-                    children: _masterList.isEmpty
-                        ? [
-                            const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Text(
-                                'No songs in master list. Add songs from Player screen!',
-                                style: TextStyle(color: Colors.white54),
-                              ),
-                            ),
-                          ]
-                        : _masterList.asMap().entries.map((entry) {
-                            final song = entry.value;
-                            final songIndex = entry.key;
-                            return _buildSongListItem(song, songIndex);
-                          }).toList(),
-                  ),
-                );
-              }
-              
-              final playlistIndex = index - 1;
-              final playlistName = _customPlaylists.keys.elementAt(playlistIndex);
-              final songs = _customPlaylists[playlistName]!;
-              
-              return Card(
-                color: _cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ExpansionTile(
-                  title: Text(
-                    playlistName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${songs.length} songs',
-                    style: TextStyle(color: _textSecondary),
-                  ),
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _getSongGradient(playlistIndex),
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.playlist_play, color: Colors.white),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: _secondaryGradient,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.add, color: Colors.white, size: 20),
-                          onPressed: () => _showAddToPlaylistDialog(playlistName),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: () => _deletePlaylist(playlistName),
-                      ),
-                    ],
-                  ),
-                  children: songs.isEmpty
-                      ? [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              children: [
-                                const Text(
-                                  'No songs in this playlist',
-                                  style: TextStyle(color: Colors.white54),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: _primaryGradient,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: ElevatedButton.icon(
-                                    onPressed: () => _showAddToPlaylistDialog(playlistName),
-                                    icon: const Icon(Icons.add, size: 16, color: Colors.white),
-                                    label: const Text(
-                                      'Add Songs from Master List',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      foregroundColor: Colors.white,
-                                      shadowColor: Colors.transparent,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ]
-                      : songs.asMap().entries.map((entry) {
-                          final song = entry.value;
-                          final songIndex = entry.key;
-                          return _buildSongListItem(song, songIndex, playlist: songs);
-                        }).toList(),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
     );
   }
 
@@ -1964,6 +1571,395 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
+  // SHUFFLE/REPEAT MENU
+  // ============================================================
+  void _showShuffleRepeatMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _bgColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          height: 280,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: _primaryGradient),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.repeat, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Playback Mode', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildMenuOption(
+                icon: Icons.shuffle,
+                title: 'Shuffle',
+                subtitle: 'Play songs in random order',
+                isActive: isShuffle,
+                onTap: () {
+                  setState(() { isShuffle = true; repeatMode = 0; });
+                  _saveData();
+                  Navigator.pop(context);
+                },
+              ),
+              const Divider(color: Colors.white24),
+              _buildMenuOption(
+                icon: Icons.repeat_outlined,
+                title: 'Repeat Off',
+                subtitle: 'Stop after current song',
+                isActive: repeatMode == 0 && !isShuffle,
+                onTap: () {
+                  setState(() { isShuffle = false; repeatMode = 0; });
+                  _saveData();
+                  Navigator.pop(context);
+                },
+              ),
+              const Divider(color: Colors.white24),
+              _buildMenuOption(
+                icon: Icons.repeat_one,
+                title: 'Repeat One',
+                subtitle: 'Repeat current song',
+                isActive: repeatMode == 1,
+                onTap: () {
+                  setState(() { isShuffle = false; repeatMode = 1; });
+                  _saveData();
+                  Navigator.pop(context);
+                },
+              ),
+              const Divider(color: Colors.white24),
+              _buildMenuOption(
+                icon: Icons.repeat,
+                title: 'Repeat All',
+                subtitle: 'Repeat entire queue',
+                isActive: repeatMode == 2,
+                onTap: () {
+                  setState(() { isShuffle = false; repeatMode = 2; });
+                  _saveData();
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMenuOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: isActive ? LinearGradient(colors: _primaryGradient) : null,
+                color: isActive ? null : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: isActive ? Colors.white : Colors.white54, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: isActive ? _accentColor : Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
+                  Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                ],
+              ),
+            ),
+            if (isActive) Icon(Icons.check_circle, color: _accentColor, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // BODY CONTENT
+  // ============================================================
+  Widget _buildBodyContent() {
+    if (_selectedIndex == 1) {
+      return _buildFavoritesTab();
+    } else if (_selectedIndex == 2) {
+      return _buildRecentTab();
+    } else if (_selectedIndex == 3) {
+      return _buildPlaylistsTab();
+    }
+    return _buildPlayerUI();
+  }
+
+  // ============================================================
+  // FAVORITES TAB
+  // ============================================================
+  Widget _buildFavoritesTab() {
+    if (_favorites.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.favorite_border, size: 64, color: Colors.white24),
+            const SizedBox(height: 16),
+            const Text('No favorites yet', style: TextStyle(color: Colors.white54, fontSize: 16)),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: _favorites.length,
+      itemBuilder: (context, index) {
+        final song = _favorites[index];
+        return _buildSongListItem(song, index);
+      },
+    );
+  }
+
+  // ============================================================
+  // RECENT TAB
+  // ============================================================
+  Widget _buildRecentTab() {
+    if (_recent.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history, size: 64, color: Colors.white24),
+            const SizedBox(height: 16),
+            const Text('No recent songs', style: TextStyle(color: Colors.white54, fontSize: 16)),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: _recent.length,
+      itemBuilder: (context, index) {
+        final song = _recent[index];
+        return _buildSongListItem(song, index);
+      },
+    );
+  }
+
+  // ============================================================
+  // PLAYLISTS TAB
+  // ============================================================
+  Widget _buildPlaylistsTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: _primaryGradient),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ElevatedButton.icon(
+              onPressed: _showCreatePlaylistDialog,
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text('Create New Playlist', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                minimumSize: const Size(double.infinity, 50),
+              ),
+            ),
+          ),
+        ),
+        
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _customPlaylists.keys.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Card(
+                  color: _cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ExpansionTile(
+                    title: Row(
+                      children: [
+                        const Icon(Icons.music_note, color: Color(0xFF6C63FF), size: 20),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'All Songs',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                    subtitle: Text(
+                      '${_masterList.length} songs',
+                      style: TextStyle(color: _textSecondary),
+                    ),
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF6C63FF), Color(0xFF3F3D9E)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.library_music, color: Colors.white),
+                    ),
+                    children: _masterList.isEmpty
+                        ? [
+                            const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text(
+                                'No songs in master list. Add songs from Player screen!',
+                                style: TextStyle(color: Colors.white54),
+                              ),
+                            ),
+                          ]
+                        : _masterList.asMap().entries.map((entry) {
+                            final song = entry.value;
+                            final songIndex = entry.key;
+                            return _buildSongListItem(song, songIndex);
+                          }).toList(),
+                  ),
+                );
+              }
+              
+              final playlistIndex = index - 1;
+              final playlistName = _customPlaylists.keys.elementAt(playlistIndex);
+              final songs = _customPlaylists[playlistName]!;
+              
+              return Card(
+                color: _cardColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ExpansionTile(
+                  title: Text(
+                    playlistName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${songs.length} songs',
+                    style: TextStyle(color: _textSecondary),
+                  ),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: _getSongGradient(playlistIndex),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.playlist_play, color: Colors.white),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: _secondaryGradient,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.add, color: Colors.white, size: 20),
+                          onPressed: () => _showAddToPlaylistDialog(playlistName),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () => _deletePlaylist(playlistName),
+                      ),
+                    ],
+                  ),
+                  children: songs.isEmpty
+                      ? [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'No songs in this playlist',
+                                  style: TextStyle(color: Colors.white54),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: _primaryGradient,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => _showAddToPlaylistDialog(playlistName),
+                                    icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                                    label: const Text(
+                                      'Add Songs from Master List',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      foregroundColor: Colors.white,
+                                      shadowColor: Colors.transparent,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ]
+                      : songs.asMap().entries.map((entry) {
+                          final song = entry.value;
+                          final songIndex = entry.key;
+                          return _buildSongListItem(song, songIndex, playlist: songs);
+                        }).toList(),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
   // PLAYER UI
   // ============================================================
   Widget _buildPlayerUI() {
@@ -2079,13 +2075,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         ),
       ),
     );
-  }
-
-  // ============================================================
-  // SHOW QUEUE BOTTOM SHEET
-  // ============================================================
-  void _showQueueBottomSheet() {
-    // Queue bottom sheet
   }
 
   // ============================================================
