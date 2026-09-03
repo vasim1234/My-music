@@ -664,7 +664,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       print('❌ File not found: ${currentFile.path}');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ File not found: ${file.path.split('/').last}'),
+          content: Text('❌ File not found'),
           backgroundColor: Colors.red,
         ),
       );
@@ -698,7 +698,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         'Luna Echo',
       );
       
-      await Future.delayed(const Duration(milliseconds: 1000));
+      // 🔥 UPDATE UI
+      await Future.delayed(const Duration(milliseconds: 500));
       
       if (mounted) {
         setState(() {
@@ -709,7 +710,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('▶️ Playing: $cleanName'),
+            content: Text('▶️ $cleanName'),
             backgroundColor: Colors.green.withOpacity(0.7),
             duration: const Duration(seconds: 1),
           ),
@@ -717,6 +718,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       }
     } else {
       print('❌ audioHandler is not MyAudioHandler');
+      print('🔍 Type: ${audioHandler.runtimeType}');
     }
   } catch (e) {
     print('❌ Error playing song: $e');
@@ -749,67 +751,56 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   Future<void> _togglePlayPause() async {
-    if (_playlist.isEmpty) {
-      await _pickSongs();
-      return;
-    }
-    
+  if (_playlist.isEmpty) {
+    print('⚠️ No songs in playlist');
+    await _pickSongs();
+    return;
+  }
+  
+  try {
     if (audioHandler == null) {
+      print('⚠️ audioHandler is null, initializing...');
       await _initAudioService();
       await Future.delayed(const Duration(milliseconds: 500));
     }
     
+    print('🔄 Toggle play/pause, isPlaying: $isPlaying');
+    
     if (isPlaying) {
+      print('⏸️ Pausing...');
       await audioHandler?.pause();
-      setState(() => isPlaying = false);
+      setState(() {
+        isPlaying = false;
+      });
     } else {
-      await audioHandler?.play();
-      setState(() => isPlaying = true);
+      print('▶️ Playing...');
+      // 🔥 If no song is loaded, play current
+      if (_playlist.isNotEmpty && audioHandler is MyAudioHandler) {
+        final handler = audioHandler as MyAudioHandler;
+        if (handler.currentSong == null) {
+          await _playCurrentSongInQueue();
+        } else {
+          await audioHandler?.play();
+        }
+      } else {
+        await _playCurrentSongInQueue();
+      }
+      setState(() {
+        isPlaying = true;
+      });
     }
     _saveData();
-  }
-void _testDirectPlay() async {
-  try {
-    print('🧪 Testing direct play...');
-    
-    // Create a simple audio player
-    final testPlayer = AudioPlayer();
-    
-    // Get first song
-    if (_playlist.isEmpty) {
-      print('❌ No songs in playlist');
-      return;
-    }
-    
-    final file = _playlist[_currentIndex];
-    if (file.path == null) {
-      print('❌ Path is null');
-      return;
-    }
-    
-    print('📁 Testing: ${file.path}');
-    await testPlayer.setAudioSource(AudioSource.uri(Uri.file(file.path!)));
-    print('✅ Audio source set');
-    
-    await testPlayer.play();
-    print('✅ Play command sent');
-    
-    await Future.delayed(const Duration(seconds: 2));
-    
-    if (testPlayer.playing) {
-      print('✅ TEST PASSED: Song is playing!');
-      // Dispose test player
-      await testPlayer.dispose();
-    } else {
-      print('❌ TEST FAILED: Song is not playing');
-      print('📊 Processing state: ${testPlayer.processingState}');
-      print('📊 Duration: ${testPlayer.duration}');
-      await testPlayer.dispose();
-    }
   } catch (e) {
-    print('❌ Test error: $e');
+    print('❌ Error toggling play/pause: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('❌ Error: $e'),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
-}
+  }
  
   void _toggleFavorite(PlatformFile song) {
     setState(() {
