@@ -238,15 +238,114 @@ void initState() {
   // ============================================================
   // AUDIO SERVICE INITIALIZATION
   // ============================================================
-  Future<void> _initAudioService() async {
-    try {
-      print('🔊 Initializing audio service...');
-      audioHandler = await initAudioService();
-      print('✅ Audio service initialized successfully');
-      print('🔍 audioHandler type: ${audioHandler.runtimeType}');
-    } catch (e) {
-      print('❌ Audio service error: $e');
+  Future<void> _playCurrentSongInQueue() async {
+  if (_playlist.isEmpty) {
+    print('⚠️ Playlist is empty');
+    return;
+  }
+  
+  try {
+    final currentFile = _playlist[_currentIndex];
+    String cleanName = _cleanSongName(currentFile.name);
+    print('🎵 Playing: $cleanName');
+    print('📁 Path: ${currentFile.path}');
+    
+    if (currentFile.path == null) {
+      print('❌ Path is null');
+      return;
     }
+
+    // 🔥 FILE CHECK
+    final file = File(currentFile.path!);
+    if (!await file.exists()) {
+      print('❌ File does NOT exist: ${currentFile.path}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ File not found: ${file.path.split('/').last}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    print('✅ File exists');
+
+    // 🔥 UPDATE RECENT
+    if (!_recent.contains(currentFile)) {
+      _recent.insert(0, currentFile);
+      if (_recent.length > 50) _recent.removeLast();
+      _saveData();
+    }
+
+    // 🔥 INIT AUDIO SERVICE
+    if (audioHandler == null) {
+      print('⚠️ audioHandler is null, initializing...');
+      await _initAudioService();
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (audioHandler is MyAudioHandler) {
+      print('✅ audioHandler is MyAudioHandler');
+      
+      final handler = audioHandler as MyAudioHandler;
+      
+      // 🔥 SET AUTO-NEXT CALLBACK
+      handler.onSongComplete = () {
+        print('🎵 Auto-next triggered from handler');
+        _playNextSong();
+      };
+      
+      // 🔥 PLAY SONG - WITH BETTER ERROR HANDLING
+      try {
+        await handler.playSong(
+          currentFile.path!,
+          cleanName,
+          'Luna Echo',
+        );
+      } catch (e) {
+        print('❌ Error in handler.playSong: $e');
+        rethrow;
+      }
+      
+      // 🔥 WAIT FOR PLAYBACK TO START
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      // 🔥 CHECK IF SONG IS ACTUALLY PLAYING
+      if (handler.isPlaying) {
+        print('✅ Song is actually playing');
+      } else {
+        print('⚠️ Song is NOT playing despite no error');
+        // 🔥 TRY TO PLAY AGAIN
+        await handler.play();
+      }
+      
+      if (mounted) {
+        setState(() {
+          isPlaying = true;
+        });
+        _saveData();
+        print('✅ Song playing: $cleanName');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('▶️ Playing: $cleanName'),
+            backgroundColor: Colors.green.withOpacity(0.7),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } else {
+      print('❌ audioHandler is not MyAudioHandler');
+    }
+  } catch (e) {
+    print('❌ Error playing song: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('❌ Error: $e'),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
   }
 
   // ============================================================
