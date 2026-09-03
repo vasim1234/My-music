@@ -1,18 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:my_music/services/background_handler.dart';
 import 'screens/player_screen.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  try {
-    print('🚀 Initializing audio service...');
-    await initAudioService();
-    print('✅ Audio service initialized');
-  } catch (e) {
-    print('❌ Audio service error: $e');
-  }
-
+void main() {
   runApp(const MyMusicApp());
 }
 
