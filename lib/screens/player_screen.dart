@@ -1112,7 +1112,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     }
   }
 
-  Future<void> _playCurrentSongInQueue() async {
+ Future<void> _playCurrentSongInQueue() async {
   if (_playlist.isEmpty) {
     print('⚠️ Playlist is empty');
     return;
@@ -1154,12 +1154,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       await Future.delayed(const Duration(milliseconds: 500));
     }
 
-    // 🔥 DIRECTLY CALL playSong METHOD
+    // 🔥 DIRECT PLAY - Use handler's player
     if (audioHandler is MyAudioHandler) {
-      print('✅ Calling playSong directly');
+      print('✅ Playing directly...');
       
       final handler = audioHandler as MyAudioHandler;
       
+      // 🔥 Direct call to playSong
       await handler.playSong(
         currentFile.path!,
         cleanName,
@@ -1197,7 +1198,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       ),
     );
   }
-  }
+ }
 
   Future<void> _playSpecificSong(PlatformFile song, {List<PlatformFile>? playlist}) async {
     print('🎵 _playSpecificSong called');
@@ -1266,52 +1267,55 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   Future<void> _togglePlayPause() async {
-    if (_playlist.isEmpty) {
-      await _pickSongs();
-      return;
+  if (_playlist.isEmpty) {
+    print('⚠️ No songs in playlist');
+    await _pickSongs();
+    return;
+  }
+  
+  try {
+    if (audioHandler == null) {
+      print('⚠️ audioHandler is null, initializing...');
+      await _initAudioService();
+      await Future.delayed(const Duration(milliseconds: 500));
     }
     
-    try {
-      if (audioHandler == null) {
-        await _initAudioService();
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
+    if (audioHandler is MyAudioHandler) {
+      final handler = audioHandler as MyAudioHandler;
       
-      print('🔄 Toggle play/pause, isPlaying: $isPlaying');
+      print('🔄 Toggle play/pause, isPlaying: ${handler.isPlaying}');
       
-      if (isPlaying) {
+      if (handler.isPlaying) {
         print('⏸️ Pausing...');
-        await audioHandler?.pause();
+        await handler.pause();
         setState(() {
           isPlaying = false;
         });
       } else {
         print('▶️ Playing...');
-        if (audioHandler is MyAudioHandler) {
-          final handler = audioHandler as MyAudioHandler;
-          if (handler.currentSong == null) {
-            await _playCurrentSongInQueue();
-          } else {
-            await audioHandler?.play();
-          }
-        } else {
+        if (handler.currentSong == null) {
           await _playCurrentSongInQueue();
+        } else {
+          await handler.play();
         }
         setState(() {
           isPlaying = true;
         });
       }
       _saveData();
-    } catch (e) {
-      print('❌ Error toggling play/pause: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Error: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    } else {
+      print('❌ audioHandler is not MyAudioHandler');
     }
+  } catch (e) {
+    print('❌ Error toggling play/pause: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('❌ Error: $e'),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
   }
 
   void _toggleFavorite(PlatformFile song) {
