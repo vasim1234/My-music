@@ -1,19 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.music.app.my_music">
     
-    <!-- Permissions -->
+    <!-- 🔥 ALL PERMISSIONS -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     
     <application
         android:label="My Music 3D"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:requestLegacyExternalStorage="true"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:allowBackup="true">
         
         <activity
             android:name=".MainActivity"
@@ -34,7 +36,7 @@
             </intent-filter>
         </activity>
         
-        <!-- Audio Service for Background Playback -->
+        <!-- 🔥 AUDIO SERVICE -->
         <service
             android:name="com.ryanheise.audioservice.AudioService"
             android:foregroundServiceType="mediaPlayback"
@@ -44,7 +46,7 @@
             </intent-filter>
         </service>
 
-        <!-- Media Button Receiver -->
+        <!-- 🔥 MEDIA BUTTON RECEIVER -->
         <receiver
             android:name="androidx.media.session.MediaButtonReceiver"
             android:exported="true">
