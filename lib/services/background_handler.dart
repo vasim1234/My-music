@@ -119,7 +119,7 @@ Future<void> playFromUri(Uri uri, [Map<String, dynamic>? extras]) async {
   // 🔥 KEEP BACKWARD COMPATIBILITY
   Future<void> playSong(String path, String title, String artist) async {
     final uri = Uri.file(path);
-    await playFromUri(uri, extras: {
+    await playFromUri(uri, {
       'title': title,
       'artist': artist,
     });
