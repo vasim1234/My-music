@@ -7,14 +7,15 @@ import 'package:flutter/material.dart';
 AudioHandler? audioHandler;
 
 class MyAudioHandler extends BaseAudioHandler {
-  final AudioPlayer _player = AudioPlayer();
+  // 🔥 PUBLIC PLAYER - Direct access for UI
+  final AudioPlayer player = AudioPlayer();
   String? _currentSongPath;
   
-  Stream<Duration> get positionStream => _player.positionStream;
-  Stream<Duration?> get durationStream => _player.durationStream;
+  Stream<Duration> get positionStream => player.positionStream;
+  Stream<Duration?> get durationStream => player.durationStream;
   
-  bool get isPlaying => _player.playing;
-  bool get isReady => _player.playing;
+  bool get isPlaying => player.playing;
+  bool get isReady => player.playing;
   String? get currentSong => _currentSongPath;
   
   MyAudioHandler() {
@@ -22,7 +23,7 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 
   void _init() {
-    _player.durationStream.listen((duration) {
+    player.durationStream.listen((duration) {
       print('⏱️ Duration: $duration');
       if (duration != null) {
         final current = mediaItem.value;
@@ -32,11 +33,11 @@ class MyAudioHandler extends BaseAudioHandler {
       }
     });
 
-    _player.positionStream.listen((position) {
+    player.positionStream.listen((position) {
       print('📍 Position: ${position.inSeconds}s');
     });
 
-    _player.playerStateStream.listen((state) {
+    player.playerStateStream.listen((state) {
       print('🎵 State: ${state.processingState}, playing: ${state.playing}');
       
       playbackState.add(
@@ -70,7 +71,7 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  // 🔥 SIMPLE PLAY SONG - DIRECT METHOD
+  // 🔥 DIRECT PLAY - SIMPLE AND WORKING
   Future<void> playSong(String path, String title, String artist) async {
     try {
       print('🎵 playSong: $title');
@@ -83,14 +84,18 @@ class MyAudioHandler extends BaseAudioHandler {
       }
       print('✅ File exists: ${file.lengthSync()} bytes');
 
-      await _player.stop();
-      await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
+      // 🔥 Stop old
+      await player.stop();
+      
+      // 🔥 Load
+      await player.setAudioSource(AudioSource.uri(Uri.file(path)));
       print('✅ Audio source set');
 
       await Future.delayed(const Duration(milliseconds: 300));
-      final duration = _player.duration;
+      final duration = player.duration;
       print('⏱️ Duration: $duration');
 
+      // 🔥 Update media item for notification
       mediaItem.add(MediaItem(
         id: path,
         title: title,
@@ -98,7 +103,8 @@ class MyAudioHandler extends BaseAudioHandler {
         duration: duration,
       ));
 
-      await _player.play();
+      // 🔥 Play
+      await player.play();
       _currentSongPath = path;
       print('✅ Playing: $title');
       
@@ -111,37 +117,37 @@ class MyAudioHandler extends BaseAudioHandler {
   @override 
   Future<void> play() async {
     print('▶️ Play called');
-    if (_player.processingState == ProcessingState.completed) {
-      await _player.seek(Duration.zero);
+    if (player.processingState == ProcessingState.completed) {
+      await player.seek(Duration.zero);
     }
-    await _player.play();
+    await player.play();
     playbackState.add(playbackState.value.copyWith(playing: true));
   }
   
   @override 
   Future<void> pause() async {
     print('⏸️ Pause called');
-    await _player.pause();
+    await player.pause();
     playbackState.add(playbackState.value.copyWith(playing: false));
   }
   
   @override 
   Future<void> stop() async {
     print('⏹️ Stop called');
-    await _player.stop();
+    await player.stop();
     _currentSongPath = null;
     playbackState.add(playbackState.value.copyWith(playing: false));
     await super.stop();
   }
   
   @override 
-  Future<void> seek(Duration p) async => _player.seek(p);
+  Future<void> seek(Duration p) async => player.seek(p);
   
   @override 
-  Future<void> setVolume(double v) async => _player.setVolume(v);
+  Future<void> setVolume(double v) async => player.setVolume(v);
   
   @override 
-  Future<void> setSpeed(double s) async => _player.setSpeed(s);
+  Future<void> setSpeed(double s) async => player.setSpeed(s);
   
   @override Future<void> skipToNext() async {}
   @override Future<void> skipToPrevious() async {}
