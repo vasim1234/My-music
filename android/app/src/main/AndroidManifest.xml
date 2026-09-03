@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- 🔥 Android 13/14 ke background play ke liye ye permission zaroori hai -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" /> 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     
@@ -46,9 +48,9 @@
             </intent-filter>
         </service>
 
-        <!-- 🔥 MEDIA BUTTON RECEIVER -->
+        <!-- 🔥 MEDIA BUTTON RECEIVER (Package ke hisaab se theek kiya gaya) -->
         <receiver
-            android:name="androidx.media.session.MediaButtonReceiver"
+            android:name="com.ryanheise.audioservice.MediaButtonReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
