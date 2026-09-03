@@ -1125,6 +1125,13 @@ void _testDirectPlay() async {
               animation: _pulseAnimation,
               accentColor: _accentColor,
             ),
+            // AlbumArt widget ke theek neeche ye add karein:
+const SizedBox(height: 20),
+ElevatedButton(
+  onPressed: _testDirectPlay,
+  style: ElevatedButton.styleFrom(backgroundColor: _accentColor),
+  child: const Text('Test Direct Play', style: TextStyle(color: Colors.white)),
+),
             const SizedBox(height: 20),
             Column(
               children: [
