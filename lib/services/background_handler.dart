@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
+
+// 🔥 IMPORTANT: VoidCallback ke liye
+// VoidCallback Flutter ka part hai, isliye flutter/material.dart import karo
+import 'package:flutter/material.dart';
 
 AudioHandler? audioHandler;
 
@@ -11,7 +14,7 @@ class MyAudioHandler extends BaseAudioHandler {
   bool _isPlayerReady = false;
   String? _currentSongPath;
   
-  // Callback for next song
+  // 🔥 Callback for next song
   VoidCallback? onSongComplete;
   
   // Streams expose
@@ -111,29 +114,15 @@ class MyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  // 🔥 MAIN PLAY SONG METHOD - WITH CLEAN STOP
+  // 🔥 MAIN PLAY SONG METHOD
   Future<void> playSong(String path, String title, String artist) async {
     try {
       print('🎵 playSong called: $title');
       print('📁 Path: $path');
       
-      // 🔥 CRITICAL: Agar same song already playing hai toh restart mat karo
-      if (_currentSongPath == path && _isPlayerReady && _player.playing) {
-        print('⏭️ Same song already playing, skipping...');
-        return;
-      }
-      
-      // 🔥 CRITICAL: STOP OLD PLAYER COMPLETELY
-      print('🛑 Stopping current player completely...');
+      // 🔥 STOP OLD PLAYER
       await _player.stop();
-      await _player.dispose();
-      
-      // 🔥 CRITICAL: Wait for dispose to complete
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      // 🔥 CRITICAL: Create NEW player
-      print('🔄 Creating new player...');
-      final newPlayer = AudioPlayer();
+      _isPlayerReady = false;
       
       // 🔥 CHECK FILE
       final file = File(path);
@@ -142,9 +131,9 @@ class MyAudioHandler extends BaseAudioHandler {
       }
       print('✅ File exists: ${file.lengthSync()} bytes');
 
-      // 🔥 SET AUDIO SOURCE on NEW player
+      // 🔥 SET AUDIO SOURCE
       print('📁 Loading audio source...');
-      await newPlayer.setAudioSource(AudioSource.uri(Uri.file(path)));
+      await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
       print('✅ Audio source set');
 
       // 🔥 WAIT FOR DURATION
@@ -153,7 +142,7 @@ class MyAudioHandler extends BaseAudioHandler {
       Duration? duration;
       while (duration == null && attempts < 10) {
         await Future.delayed(const Duration(milliseconds: 200));
-        duration = newPlayer.duration;
+        duration = _player.duration;
         attempts++;
         print('⏳ Attempt $attempts: Duration = $duration');
       }
@@ -171,20 +160,19 @@ class MyAudioHandler extends BaseAudioHandler {
       this.mediaItem.add(mediaItem);
       print('✅ Media item updated with duration: $duration');
 
-      // 🔥 CONNECT STREAMS TO NEW PLAYER
-      _connectPlayerStreams(newPlayer);
-
       // 🔥 START PLAYING
       print('▶️ Starting playback...');
-      await newPlayer.play();
+      await _player.play();
       
       _currentSongPath = path;
       _isPlayerReady = true;
       
-      // 🔥 IMPORTANT: Store new player reference
-      // Since _player is final, we need to use a different approach
-      // Use _player variable but we need to replace it
-      // Actually we'll use a different approach - use a single player
+      playbackState.add(
+        playbackState.value.copyWith(
+          playing: true,
+          processingState: AudioProcessingState.ready,
+        ),
+      );
       
       print('✅ Song playing successfully: $title');
       
@@ -193,36 +181,6 @@ class MyAudioHandler extends BaseAudioHandler {
       print('📚 Stacktrace: $stacktrace');
       rethrow;
     }
-  }
-
-  // 🔥 CONNECT STREAMS TO PLAYER
-  void _connectPlayerStreams(AudioPlayer player) {
-    // Duration
-    player.durationStream.listen((duration) {
-      print('⏱️ [New] Duration: $duration');
-      if (duration != null) {
-        final current = mediaItem.value;
-        if (current != null) {
-          mediaItem.add(current.copyWith(duration: duration));
-        }
-      }
-    });
-
-    // Position
-    player.positionStream.listen((position) {
-      print('📍 [New] Position: $position');
-    });
-
-    // Player State
-    player.playerStateStream.listen((state) {
-      print('🎵 [New] State: ${state.processingState}, playing: ${state.playing}');
-      playbackState.add(
-        playbackState.value.copyWith(
-          playing: state.playing,
-          processingState: _getAudioProcessingState(state.processingState),
-        ),
-      );
-    });
   }
 
   Uri? _getArtUri(String path) {
