@@ -157,13 +157,16 @@ class Song {
 }
 
 // ============================================================
-// AUDIO MANAGER EXTENDED - COMPLETE FIXED VERSION
+// AUDIO MANAGER EXTENDED - COMPLETE
 // ============================================================
 enum PlaybackStatus { stopped, playing, paused }
 
 class AudioManagerExtended extends ChangeNotifier {
   final AudioManager _audioManager = AudioManager();
   
+  // ============================================================
+  // VARIABLES
+  // ============================================================
   PlaybackStatus _status = PlaybackStatus.stopped;
   Song? _currentSong;
   Duration _position = Duration.zero;
@@ -178,13 +181,13 @@ class AudioManagerExtended extends ChangeNotifier {
   List<Song> _favorites = [];
   Map<String, List<Song>> _playlists = {};
   
-  // ✅ FIXED: Added these missing fields
   StreamSubscription<Duration?>? _positionSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
-  
   bool _isCompleting = false;
   
-  // Getters
+  // ============================================================
+  // GETTERS
+  // ============================================================
   PlaybackStatus get status => _status;
   Song? get currentSong => _currentSong;
   Duration get position => _position;
@@ -201,6 +204,9 @@ class AudioManagerExtended extends ChangeNotifier {
   List<Song> get favorites => _favorites;
   Map<String, List<Song>> get playlists => _playlists;
 
+  // ============================================================
+  // CONSTRUCTOR & INIT
+  // ============================================================
   AudioManagerExtended() {
     _init();
   }
@@ -211,6 +217,9 @@ class AudioManagerExtended extends ChangeNotifier {
     _loadSavedData();
   }
 
+  // ============================================================
+  // STREAMS & COMPLETION
+  // ============================================================
   void _setupStreams() {
     _positionSubscription = _audioManager.positionStream.listen((position) {
       if (position != null) {
@@ -315,7 +324,9 @@ class AudioManagerExtended extends ChangeNotifier {
     await _playCurrent();
   }
 
-  // Queue Persistence
+  // ============================================================
+  // QUEUE PERSISTENCE
+  // ============================================================
   Future<void> _saveQueue() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -352,6 +363,9 @@ class AudioManagerExtended extends ChangeNotifier {
     }
   }
 
+  // ============================================================
+  // SAVE/LOAD DATA
+  // ============================================================
   Future<void> _loadSavedData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -413,7 +427,66 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // PUBLIC METHODS
+  // PUBLIC METHODS - PLAYLIST
+  // ============================================================
+  
+  void createPlaylist(String name) {
+    if (name.trim().isNotEmpty && !_playlists.containsKey(name)) {
+      _playlists[name.trim()] = [];
+      _saveData();
+      notifyListeners();
+      print('✅ Playlist created: $name');
+    }
+  }
+
+  void deletePlaylist(String name) {
+    _playlists.remove(name);
+    _saveData();
+    notifyListeners();
+    print('✅ Playlist deleted: $name');
+  }
+
+  void addToPlaylist(String name, Song song) {
+    if (!_playlists.containsKey(name)) {
+      _playlists[name] = [];
+    }
+    if (!_playlists[name]!.contains(song)) {
+      _playlists[name]!.add(song);
+      _saveData();
+      notifyListeners();
+      print('✅ Added "${song.displayName}" to playlist: $name');
+    }
+  }
+
+  void addSongsToPlaylist(String name, List<Song> songs) {
+    if (!_playlists.containsKey(name)) {
+      _playlists[name] = [];
+    }
+    final currentSongs = _playlists[name]!;
+    for (var song in songs) {
+      if (!currentSongs.contains(song)) {
+        currentSongs.add(song);
+      }
+    }
+    _saveData();
+    notifyListeners();
+    print('✅ Added ${songs.length} songs to playlist: $name');
+  }
+
+  void removeFromPlaylist(String name, Song song) {
+    if (_playlists.containsKey(name)) {
+      _playlists[name]!.remove(song);
+      if (_playlists[name]!.isEmpty) {
+        _playlists.remove(name);
+      }
+      _saveData();
+      notifyListeners();
+      print('✅ Removed "${song.displayName}" from playlist: $name');
+    }
+  }
+
+  // ============================================================
+  // PUBLIC METHODS - PLAYBACK
   // ============================================================
   
   Future<void> playSong(Song song, {List<Song>? queue}) async {
@@ -511,42 +584,6 @@ class AudioManagerExtended extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addToPlaylist(String name, Song song) {
-    if (!_playlists.containsKey(name)) {
-      _playlists[name] = [];
-    }
-    if (!_playlists[name]!.contains(song)) {
-      _playlists[name]!.add(song);
-      _saveData();
-      notifyListeners();
-    }
-  }
-
-  void removeFromPlaylist(String name, Song song) {
-    if (_playlists.containsKey(name)) {
-      _playlists[name]!.remove(song);
-      if (_playlists[name]!.isEmpty) {
-        _playlists.remove(name);
-      }
-      _saveData();
-      notifyListeners();
-    }
-  }
-
-  void createPlaylist(String name) {
-    if (name.trim().isNotEmpty && !_playlists.containsKey(name)) {
-      _playlists[name.trim()] = [];
-      _saveData();
-      notifyListeners();
-    }
-  }
-
-  void deletePlaylist(String name) {
-    _playlists.remove(name);
-    _saveData();
-    notifyListeners();
-  }
-
   void clearQueue() {
     _queue.clear();
     _currentSong = null;
@@ -560,6 +597,19 @@ class AudioManagerExtended extends ChangeNotifier {
 
   void addSongsToQueue(List<Song> songs) {
     _queue.addAll(songs);
+    _saveData();
+    notifyListeners();
+  }
+
+  void removeFromQueue(Song song) {
+    _queue.remove(song);
+    if (_currentIndex >= _queue.length) {
+      _currentIndex = _queue.isNotEmpty ? _queue.length - 1 : 0;
+    }
+    if (_queue.isEmpty) {
+      _currentSong = null;
+      _status = PlaybackStatus.stopped;
+    }
     _saveData();
     notifyListeners();
   }
