@@ -2027,266 +2027,356 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // PLAYER UI
-  // ============================================================
-  Widget _buildPlayerUI() {
-    final queue = _audioManager.queue;
-    final currentSong = _audioManager.currentSong;
-    final isPlaying = _audioManager.isPlaying;
-    final currentIndex = _audioManager.currentIndex;
-    
-    String currentSongName = currentSong?.displayName ?? "No song playing";
-    bool hasSongs = queue.isNotEmpty;
-    List<Color> currentGradient = hasSongs 
-        ? AppHelpers.getSongGradient(currentIndex)
-        : AppConstants.primaryGradient;
+// PLAYER UI - EXACT DESIGN
+// ============================================================
+Widget _buildPlayerUI() {
+  final queue = _audioManager.queue;
+  final currentSong = _audioManager.currentSong;
+  final isPlaying = _audioManager.isPlaying;
+  final currentIndex = _audioManager.currentIndex;
+  
+  String currentSongName = currentSong?.displayName ?? "No song playing";
+  bool hasSongs = queue.isNotEmpty;
+  List<Color> currentGradient = hasSongs 
+      ? AppHelpers.getSongGradient(currentIndex)
+      : AppConstants.primaryGradient;
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-            Text(
-              currentSongName,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              currentSong?.artist ?? "Luna Echo",
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 20),
-            
-            AlbumArt(
-              isPlaying: isPlaying,
-              is3DMode: _is3DMode,
-              songName: currentSongName,
-              songPath: currentSong?.path,
-              gradient: currentGradient,
-              isSleepTimerActive: _sleepTimerActive,
-              animation: _pulseAnimation,
-              accentColor: AppConstants.accentColor,
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Progress Bar
-            Column(
-              children: [
-                SliderTheme(
-                  data: SliderThemeData(
-                    trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                    activeTrackColor: AppConstants.accentColor,
-                    inactiveTrackColor: Colors.grey.shade800,
-                    thumbColor: AppConstants.accentColor,
+  return SafeArea(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // ============================================================
+          // SONG INFO - CENTER ALIGNED
+          // ============================================================
+          Column(
+            children: [
+              Text(
+                currentSongName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                currentSong?.artist ?? "Luna Echo",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppConstants.textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 30),
+          
+          // ============================================================
+          // ALBUM ART
+          // ============================================================
+          AlbumArt(
+            isPlaying: isPlaying,
+            is3DMode: _is3DMode,
+            songName: currentSongName,
+            songPath: currentSong?.path,
+            gradient: currentGradient,
+            isSleepTimerActive: _sleepTimerActive,
+            animation: _pulseAnimation,
+            accentColor: AppConstants.accentColor,
+          ),
+          
+          const SizedBox(height: 30),
+          
+          // ============================================================
+          // PROGRESS BAR
+          // ============================================================
+          Column(
+            children: [
+              SliderTheme(
+                data: SliderThemeData(
+                  trackHeight: 3,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                  activeTrackColor: AppConstants.accentColor,
+                  inactiveTrackColor: Colors.grey.shade800,
+                  thumbColor: AppConstants.accentColor,
+                ),
+                child: Slider(
+                  min: 0.0,
+                  max: _audioManager.duration.inSeconds.toDouble() > 0 
+                      ? _audioManager.duration.inSeconds.toDouble() 
+                      : 1.0,
+                  value: _audioManager.position.inSeconds.toDouble().clamp(
+                      0.0, 
+                      _audioManager.duration.inSeconds.toDouble() > 0 
+                          ? _audioManager.duration.inSeconds.toDouble() 
+                          : 1.0
                   ),
-                  child: Slider(
-                    min: 0.0,
-                    max: _audioManager.duration.inSeconds.toDouble() > 0 
-                        ? _audioManager.duration.inSeconds.toDouble() 
-                        : 1.0,
-                    value: _audioManager.position.inSeconds.toDouble().clamp(
-                        0.0, 
-                        _audioManager.duration.inSeconds.toDouble() > 0 
-                            ? _audioManager.duration.inSeconds.toDouble() 
-                            : 1.0
-                    ),
-                    onChanged: (value) async {
-                      final position = Duration(seconds: value.toInt());
-                      await _audioManager.seek(position);
-                    },
+                  onChanged: (value) async {
+                    final position = Duration(seconds: value.toInt());
+                    await _audioManager.seek(position);
+                  },
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    AppHelpers.formatDuration(_audioManager.position),
+                    style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
+                  ),
+                  Text(
+                    AppHelpers.formatDuration(_audioManager.duration),
+                    style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // ============================================================
+          // PLAYBACK CONTROLS - WITH REPEAT & QUEUE BUTTONS
+          // ============================================================
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // LEFT: Repeat/Loop Button
+              GestureDetector(
+                onTap: _showShuffleRepeatMenu,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _audioManager.repeatMode != 0 
+                        ? AppConstants.accentColor.withOpacity(0.15)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Icon(
+                    _audioManager.repeatMode == 0 ? Icons.repeat_outlined :
+                    _audioManager.repeatMode == 1 ? Icons.repeat_one :
+                    Icons.repeat,
+                    color: _audioManager.repeatMode != 0 
+                        ? AppConstants.accentColor 
+                        : Colors.white54,
+                    size: 22,
                   ),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      AppHelpers.formatDuration(_audioManager.position),
-                      style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
-                    ),
-                    Text(
-                      AppHelpers.formatDuration(_audioManager.duration),
-                      style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
+              ),
+              
+              const SizedBox(width: 20),
+              
+              // PREVIOUS BUTTON
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.05),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 28),
+                  onPressed: hasSongs ? () => _audioManager.playPrevious() : null,
+                  padding: const EdgeInsets.all(12),
+                ),
+              ),
+              
+              const SizedBox(width: 8),
+              
+              // PLAY/PAUSE BUTTON - PROMINENT
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: currentGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppConstants.accentColor.withOpacity(0.4),
+                      blurRadius: 25,
+                      spreadRadius: 5,
                     ),
                   ],
                 ),
-              ],
-            ),
-            
-            const SizedBox(height: 14),
-            
-            // Playback Controls
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 24),
-                  onPressed: hasSongs ? () => _audioManager.playPrevious() : null,
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: currentGradient),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppConstants.accentColor.withOpacity(0.35),
-                        blurRadius: 15,
-                        spreadRadius: 3,
-                      ),
-                    ],
+                child: IconButton(
+                  icon: Icon(
+                    isPlaying ? Icons.pause : Icons.play_arrow,
+                    color: Colors.white,
+                    size: 36,
                   ),
-                  child: IconButton(
-                    icon: Icon(
-                      isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
-                    ),
-                    iconSize: 30,
-                    onPressed: () => _audioManager.togglePlayPause(),
-                    padding: const EdgeInsets.all(12),
-                  ),
+                  onPressed: () => _audioManager.togglePlayPause(),
+                  padding: const EdgeInsets.all(18),
                 ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 24),
-                  onPressed: hasSongs ? () => _audioManager.playNext() : null,
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 14),
-            
-            // Additional Controls
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildActionButton(
-                  icon: Icons.three_mp,
-                  label: '3D',
-                  isActive: _is3DMode,
-                  activeColor: Colors.purple,
-                  size: 18,
-                  onTap: () {
-                    setState(() {
-                      _is3DMode = !_is3DMode;
-                    });
-                  },
-                ),
-                _buildActionButton(
-                  icon: Icons.volume_up,
-                  label: 'Volume',
-                  isActive: false,
-                  activeColor: AppConstants.accentColor,
-                  size: 18,
-                  onTap: _showVolumePopup,
-                ),
-                _buildActionButton(
-                  icon: Icons.shuffle,
-                  label: 'Shuffle',
-                  isActive: _audioManager.isShuffle,
-                  activeColor: AppConstants.accentColor,
-                  size: 18,
-                  onTap: () => _audioManager.toggleShuffle(),
-                ),
-                _buildActionButton(
-                  icon: _audioManager.repeatMode == 0 ? Icons.repeat_outlined :
-                         _audioManager.repeatMode == 1 ? Icons.repeat_one :
-                         Icons.repeat,
-                  label: 'Repeat',
-                  isActive: _audioManager.repeatMode != 0,
-                  activeColor: AppConstants.accentColor,
-                  size: 18,
-                  onTap: _showShuffleRepeatMenu,
-                ),
-                _buildActionButton(
-                  icon: Icons.timer,
-                  label: 'Timer',
-                  isActive: _sleepTimerActive,
-                  activeColor: AppConstants.warningColor,
-                  size: 18,
-                  onTap: _showSleepTimerDialog,
-                ),
-                _buildActionButton(
-                  icon: Icons.favorite,
-                  label: 'Fav',
-                  isActive: currentSong != null && _audioManager.favorites.contains(currentSong),
-                  activeColor: Colors.red,
-                  size: 18,
-                  onTap: () {
-                    if (currentSong != null) {
-                      _audioManager.toggleFavorite(currentSong);
-                      setState(() {});
-                    }
-                  },
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required Color activeColor,
-    required double size,
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isActive ? activeColor.withOpacity(0.15) : AppConstants.cardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isActive ? activeColor : Colors.grey.shade800,
-                width: isActive ? 2 : 1,
               ),
-              boxShadow: isActive ? [
-                BoxShadow(
-                  color: activeColor.withOpacity(0.3),
-                  blurRadius: 8,
-                  spreadRadius: 1,
+              
+              const SizedBox(width: 8),
+              
+              // NEXT BUTTON
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.05),
                 ),
-              ] : null,
-            ),
-            child: Icon(
-              icon,
-              color: isActive ? activeColor : Colors.white54,
-              size: size,
-            ),
+                child: IconButton(
+                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 28),
+                  onPressed: hasSongs ? () => _audioManager.playNext() : null,
+                  padding: const EdgeInsets.all(12),
+                ),
+              ),
+              
+              const SizedBox(width: 20),
+              
+              // RIGHT: Queue/Playlist Button
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedTab = 3; // Switch to Playlists tab
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: AppConstants.secondaryGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: const Icon(
+                    Icons.queue_music,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            style: TextStyle(
-              color: isActive ? activeColor : AppConstants.textSecondary,
-              fontSize: 9,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-            ),
+          
+          const SizedBox(height: 30),
+          
+          // ============================================================
+          // BOTTOM UTILITY ROW - 3D, EQ, Volume, Heart, Timer
+          // ============================================================
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // 3D Audio
+              _buildUtilityButton(
+                icon: Icons.three_mp,
+                label: '3D',
+                isActive: _is3DMode,
+                activeColor: Colors.purple,
+                onTap: () {
+                  setState(() {
+                    _is3DMode = !_is3DMode;
+                  });
+                },
+              ),
+              
+              // EQ (Equalizer)
+              _buildUtilityButton(
+                icon: Icons.equalizer,
+                label: 'EQ',
+                isActive: _isEqActive,
+                activeColor: AppConstants.accentColor,
+                onTap: _showEqualizerDialog,
+              ),
+              
+              // Volume
+              _buildUtilityButton(
+                icon: Icons.volume_up,
+                label: 'Volume',
+                isActive: false,
+                activeColor: Colors.white,
+                onTap: _showVolumePopup,
+              ),
+              
+              // Heart / Favorite
+              _buildUtilityButton(
+                icon: currentSong != null && _audioManager.favorites.contains(currentSong) 
+                    ? Icons.favorite 
+                    : Icons.favorite_border,
+                label: 'Heart',
+                isActive: currentSong != null && _audioManager.favorites.contains(currentSong),
+                activeColor: Colors.red,
+                onTap: () {
+                  if (currentSong != null) {
+                    _audioManager.toggleFavorite(currentSong);
+                    setState(() {});
+                  }
+                },
+              ),
+              
+              // Timer
+              _buildUtilityButton(
+                icon: Icons.timer,
+                label: 'Timer',
+                isActive: _sleepTimerActive,
+                activeColor: AppConstants.warningColor,
+                onTap: _showSleepTimerDialog,
+              ),
+            ],
           ),
+          
+          const SizedBox(height: 16),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
+
+// ============================================================
+// UTILITY BUTTON - For bottom row
+// ============================================================
+Widget _buildUtilityButton({
+  required IconData icon,
+  required String label,
+  required bool isActive,
+  required Color activeColor,
+  required VoidCallback onTap,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isActive ? activeColor.withOpacity(0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: isActive 
+                ? Border.all(color: activeColor.withOpacity(0.5), width: 1.5)
+                : null,
+          ),
+          child: Icon(
+            icon,
+            color: isActive ? activeColor : Colors.white54,
+            size: 22,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: isActive ? activeColor : AppConstants.textSecondary,
+            fontSize: 10,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   // ============================================================
   // BODY CONTENT
