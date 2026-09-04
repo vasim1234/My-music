@@ -185,8 +185,6 @@ class AudioManagerExtended extends ChangeNotifier {
   StreamSubscription<Duration?>? _positionSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
   bool _isCompleting = false;
-  
-  // ✅ Track if audio is prepared
   bool _isAudioPrepared = false;
   
   // ============================================================
@@ -221,7 +219,6 @@ class AudioManagerExtended extends ChangeNotifier {
     _setupStreams();
     _loadSavedData();
     
-    // ✅ FIX 1: Auto-play first song after loading with delay
     Future.delayed(const Duration(milliseconds: 500), () {
       _prepareFirstSong();
     });
@@ -281,7 +278,7 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // ✅ FIX 1: PREPARE FIRST SONG ON APP START
+  // PREPARE FIRST SONG
   // ============================================================
   void _prepareFirstSong() {
     if (_queue.isNotEmpty && _currentSong == null) {
@@ -289,16 +286,13 @@ class AudioManagerExtended extends ChangeNotifier {
       _currentIndex = 0;
       final song = _queue[_currentIndex];
       _currentSong = song;
-      
-      // ✅ Pre-load audio source without playing
       _preloadAudio(song);
-      
       notifyListeners();
     }
   }
 
   // ============================================================
-  // ✅ NEW: PRELOAD AUDIO (Prepare without playing)
+  // PRELOAD AUDIO
   // ============================================================
   Future<void> _preloadAudio(Song song) async {
     try {
@@ -325,7 +319,7 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // ✅ FIX 3: UPDATED _playCurrent WITH PROPER ERROR HANDLING
+  // PLAY CURRENT
   // ============================================================
   Future<void> _playCurrent() async {
     if (_queue.isEmpty) {
@@ -358,7 +352,6 @@ class AudioManagerExtended extends ChangeNotifier {
       _currentSong = song;
       print('📁 Loading audio file: ${song.path}');
       
-      // ✅ Play the song
       await _audioManager.playSong(song.path, song.displayName, song.artist);
       _isAudioPrepared = true;
       _updatePlaybackState(PlaybackStatus.playing);
@@ -598,7 +591,7 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // ✅ PUBLIC PLAYBACK METHODS - WITH ALL FIXES
+  // PUBLIC PLAYBACK METHODS
   // ============================================================
   
   Future<void> play() async {
@@ -662,7 +655,7 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // ✅ FIX 4: UPDATED togglePlayPause - WITH AUDIO PREPARED CHECK
+  // TOGGLE PLAY/PAUSE - FIXED
   // ============================================================
   Future<void> togglePlayPause() async {
     if (_queue.isEmpty) {
@@ -674,7 +667,6 @@ class AudioManagerExtended extends ChangeNotifier {
     print('📌 Current song: ${_currentSong?.displayName ?? "null"}');
     print('📌 Audio prepared: $_isAudioPrepared');
     
-    // ✅ FIX: If no current song, play first song
     if (_currentSong == null && _queue.isNotEmpty) {
       print('▶️ No current song, playing first song from queue...');
       _currentIndex = 0;
@@ -682,7 +674,6 @@ class AudioManagerExtended extends ChangeNotifier {
       return;
     }
     
-    // ✅ FIX: If audio is not prepared, prepare it
     if (_currentSong != null && !_isAudioPrepared) {
       print('▶️ Audio not prepared, preparing now...');
       await _preloadAudio(_currentSong!);
@@ -2640,7 +2631,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 
                 const SizedBox(width: 8),
                 
-                // ✅ PLAY/PAUSE BUTTON - FIXED
+                // PLAY/PAUSE BUTTON - FIXED
                 AnimatedBuilder(
                   animation: _audioManager,
                   builder: (context, child) {
