@@ -12,7 +12,7 @@ class AudioManager {
   String? _currentSongPath;
   bool _isPlaying = false;
 
-  // ✅ FIXED: Correct stream types
+  // ✅ FIXED: Correct stream types (non-nullable)
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration> get durationStream => _player.durationStream;
 
@@ -28,37 +28,37 @@ class AudioManager {
 
   Future<void> playSong(String path, String title, String artist) async {
     try {
-      print('PlaySong: $title');
-      print('Path: $path');
+      print('🎵 PlaySong: $title');
+      print('📁 Path: $path');
       
       final file = File(path);
       if (!await file.exists()) {
-        print('File not found');
+        print('❌ File not found');
         throw Exception('File not found');
       }
-      print('File exists: ${file.lengthSync()} bytes');
+      print('✅ File exists: ${file.lengthSync()} bytes');
       
       await _player.stop();
       await _player.setAudioSource(AudioSource.file(path));
-      print('Audio source set');
+      print('✅ Audio source set');
       
       await Future.delayed(const Duration(milliseconds: 300));
       final duration = _player.duration;
-      print('Duration: $duration');
+      print('⏱️ Duration: $duration');
 
       await _player.play();
       _currentSongPath = path;
       _isPlaying = true;
-      print('Playing: $title');
+      print('▶️ Playing: $title');
 
     } catch (e) {
-      print('Error: $e');
+      print('❌ Error: $e');
       rethrow;
     }
   }
 
   Future<void> play() async {
-    print('Play called');
+    print('▶️ Play called');
     if (_player.processingState == ProcessingState.completed) {
       await _player.seek(Duration.zero);
     }
@@ -67,24 +67,24 @@ class AudioManager {
   }
 
   Future<void> pause() async {
-    print('Pause called');
+    print('⏸️ Pause called');
     await _player.pause();
     _isPlaying = false;
   }
 
   Future<void> stop() async {
-    print('Stop called');
+    print('⏹️ Stop called');
     await _player.stop();
     _isPlaying = false;
   }
 
   Future<void> seek(Duration position) async {
-    print('Seek called: ${position.inSeconds}s');
+    print('⏩ Seek called: ${position.inSeconds}s');
     await _player.seek(position);
   }
 
   Future<void> setVolume(double volume) async {
-    print('Set volume: $volume');
+    print('🔊 Set volume: $volume');
     await _player.setVolume(volume);
   }
 
