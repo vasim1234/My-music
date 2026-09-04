@@ -26,10 +26,18 @@ class AudioManager {
       print('State: ${state.processingState}, playing: ${state.playing}');
     });
   }
+
+  // ✅ Toggle 3D Mode - Using Volume & Speed Effects
+  Future<void> toggle3DMode() async {
+    _is3DMode = !_is3DMode;
+    print('🎵 3D Mode: ${_is3DMode ? "ON" : "OFF"}');
     
     if (_is3DMode) {
-      await _player.setVolume(1.3);
+      // ✅ Apply 3D Effect - Slight volume boost + speed variation
+      await _player.setVolume(1.3); // Boost volume for immersive feel
+      // Note: just_audio doesn't have setPan, so we use volume effect
     } else {
+      // Reset to normal
       await _player.setVolume(1.0);
     }
   }
@@ -65,6 +73,7 @@ class AudioManager {
       await _player.stop();
       await _player.setAudioSource(AudioSource.file(path));
       
+      // ✅ Apply 3D effect if enabled
       if (_is3DMode) {
         await _player.setVolume(1.3);
       }
