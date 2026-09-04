@@ -291,9 +291,6 @@ class AudioManagerExtended extends ChangeNotifier {
     }
   }
 
-  // ============================================================
-  // PRELOAD AUDIO
-  // ============================================================
   Future<void> _preloadAudio(Song song) async {
     try {
       print('📁 Preloading audio: ${song.displayName}');
@@ -319,64 +316,67 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // PLAY CURRENT
+  // ✅ _playCurrent() - YAHAN DAALA HAI
   // ============================================================
   Future<void> _playCurrent() async {
-  if (_queue.isEmpty) {
-    print('⚠️ Queue is empty');
-    _updatePlaybackState(PlaybackStatus.stopped);
-    return;
-  }
-  
-  if (_currentIndex >= _queue.length) {
-    _currentIndex = 0;
-  }
-  
-  final song = _queue[_currentIndex];
-  print('🎵 _playCurrent called for: ${song.displayName}');
-  
-  if (!song.exists) {
-    print('❌ Song file does not exist: ${song.path}');
-    _queue.remove(song);
-    if (_queue.isNotEmpty) {
-      _currentIndex = 0;
-      await _playCurrent();
-    } else {
+    if (_queue.isEmpty) {
+      print('⚠️ Queue is empty');
       _updatePlaybackState(PlaybackStatus.stopped);
+      return;
     }
-    _saveData();
-    return;
+    
+    if (_currentIndex >= _queue.length) {
+      _currentIndex = 0;
+    }
+    
+    final song = _queue[_currentIndex];
+    print('🎵 _playCurrent called for: ${song.displayName}');
+    
+    if (!song.exists) {
+      print('❌ Song file does not exist: ${song.path}');
+      _queue.remove(song);
+      if (_queue.isNotEmpty) {
+        _currentIndex = 0;
+        await _playCurrent();
+      } else {
+        _updatePlaybackState(PlaybackStatus.stopped);
+      }
+      _saveData();
+      return;
+    }
+
+    try {
+      _currentSong = song;
+      print('📁 Loading audio file: ${song.path}');
+      
+      await _audioManager.playSong(song.path, song.displayName, song.artist);
+      _isAudioPrepared = true;
+      
+      // ✅ FIX: Always update state and notify
+      _status = PlaybackStatus.playing;
+      notifyListeners();
+      _saveData();
+      print('✅ Audio loaded and playing, UI updated');
+      
+      _recent.remove(song);
+      _recent.insert(0, song);
+      if (_recent.length > AppConstants.maxRecentSongs) _recent.removeLast();
+      
+      _queue[_currentIndex] = song.copyWith(lastPlayed: DateTime.now());
+      
+      _isCompleting = false;
+    } catch (e) {
+      print('❌ Error playing song: $e');
+      _status = PlaybackStatus.stopped;
+      _currentSong = null;
+      _isAudioPrepared = false;
+      notifyListeners();
+    }
   }
 
-  try {
-    _currentSong = song;
-    print('📁 Loading audio file: ${song.path}');
-    
-    await _audioManager.playSong(song.path, song.displayName, song.artist);
-    _isAudioPrepared = true;
-    
-    // ✅ FIX: Always update state and notify
-    _status = PlaybackStatus.playing;
-    notifyListeners();
-    _saveData();
-    print('✅ Audio loaded and playing, UI updated');
-    
-    _recent.remove(song);
-    _recent.insert(0, song);
-    if (_recent.length > AppConstants.maxRecentSongs) _recent.removeLast();
-    
-    _queue[_currentIndex] = song.copyWith(lastPlayed: DateTime.now());
-    
-    _isCompleting = false;
-  } catch (e) {
-    print('❌ Error playing song: $e');
-    _status = PlaybackStatus.stopped;
-    _currentSong = null;
-    _isAudioPrepared = false;
-    notifyListeners();
-  }
-  }
-
+  // ============================================================
+  // _playNext()
+  // ============================================================
   Future<void> _playNext() async {
     if (_queue.isEmpty) return;
     
@@ -657,46 +657,43 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // TOGGLE PLAY/PAUSE - FIXED
+  // TOGGLE PLAY/PAUSE
   // ============================================================
   Future<void> togglePlayPause() async {
-  if (_queue.isEmpty) {
-    print('⚠️ Queue is empty, cannot toggle play/pause');
-    return;
-  }
-  
-  print('🔄 Toggle play/pause called. Current status: $_status');
-  print('📌 Current song: ${_currentSong?.displayName ?? "null"}');
-  print('📌 Audio prepared: $_isAudioPrepared');
-  
-  // ✅ FIX 1: If no current song, play first song
-  if (_currentSong == null && _queue.isNotEmpty) {
-    print('▶️ No current song, playing first song from queue...');
-    _currentIndex = 0;
-    await _playCurrent();
-    // ✅ Ensure UI updates after play starts
-    _updatePlaybackState(PlaybackStatus.playing);
-    return;
-  }
-  
-  // ✅ FIX 2: If audio is not prepared, prepare it
-  if (_currentSong != null && !_isAudioPrepared) {
-    print('▶️ Audio not prepared, preparing now...');
-    await _preloadAudio(_currentSong!);
-    await _audioManager.play();
-    _updatePlaybackState(PlaybackStatus.playing);
-    return;
-  }
-  
-  if (_status == PlaybackStatus.playing) {
-    print('⏸️ Pausing...');
-    await _audioManager.pause();
-    _updatePlaybackState(PlaybackStatus.paused);
-  } else {
-    print('▶️ Resuming...');
-    await _audioManager.play();
-    _updatePlaybackState(PlaybackStatus.playing);
-  }
+    if (_queue.isEmpty) {
+      print('⚠️ Queue is empty, cannot toggle play/pause');
+      return;
+    }
+    
+    print('🔄 Toggle play/pause called. Current status: $_status');
+    print('📌 Current song: ${_currentSong?.displayName ?? "null"}');
+    print('📌 Audio prepared: $_isAudioPrepared');
+    
+    if (_currentSong == null && _queue.isNotEmpty) {
+      print('▶️ No current song, playing first song from queue...');
+      _currentIndex = 0;
+      await _playCurrent();
+      _updatePlaybackState(PlaybackStatus.playing);
+      return;
+    }
+    
+    if (_currentSong != null && !_isAudioPrepared) {
+      print('▶️ Audio not prepared, preparing now...');
+      await _preloadAudio(_currentSong!);
+      await _audioManager.play();
+      _updatePlaybackState(PlaybackStatus.playing);
+      return;
+    }
+    
+    if (_status == PlaybackStatus.playing) {
+      print('⏸️ Pausing...');
+      await _audioManager.pause();
+      _updatePlaybackState(PlaybackStatus.paused);
+    } else {
+      print('▶️ Resuming...');
+      await _audioManager.play();
+      _updatePlaybackState(PlaybackStatus.playing);
+    }
   }
 
   void toggleShuffle() {
