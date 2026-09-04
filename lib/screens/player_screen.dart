@@ -178,8 +178,8 @@ class AudioManagerExtended extends ChangeNotifier {
   List<Song> _favorites = [];
   Map<String, List<Song>> _playlists = {};
   
-  StreamSubscription<Duration?>? _positionSubscription;
-  StreamSubscription<Duration?>? _durationSubscription;
+  Stream<Duration?> get positionStream => _player.positionStream;
+  Stream<Duration?> get durationStream => _player.durationStream;
   
   bool _isCompleting = false;
   
