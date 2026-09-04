@@ -158,7 +158,7 @@ class Song {
 
 // ============================================================
 // AUDIO MANAGER EXTENDED - FIXED VERSION
-// ============================================================
+// ============================================================ 
 enum PlaybackStatus { stopped, playing, paused }
 
 class AudioManagerExtended extends ChangeNotifier {
@@ -312,6 +312,109 @@ class AudioManagerExtended extends ChangeNotifier {
     _isCompleting = false;
     await _playCurrent();
   }
+
+  // ✅ Save queue to SharedPreferences
+  Future<void> _saveQueue() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      List<String> queuePaths = _queue.map((s) => s.path).toList();
+      await prefs.setStringList('queue', queuePaths);
+      await prefs.setInt('currentIndex', _currentIndex);
+    } catch (e) {
+      print('❌ Error saving queue: $e');
+    }
+  }
+
+  // ✅ Load queue from SharedPreferences
+  Future<void> _loadQueue() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      List<String>? queuePaths = prefs.getStringList('queue');
+      if (queuePaths != null && queuePaths.isNotEmpty) {
+        _queue = queuePaths
+            .where((path) => File(path).existsSync())
+            .map((path) => Song(path: path, name: path.split('/').last))
+            .toList();
+        
+        _currentIndex = prefs.getInt('currentIndex') ?? 0;
+        if (_currentIndex >= _queue.length) {
+          _currentIndex = _queue.isNotEmpty ? _queue.length - 1 : 0;
+        }
+        
+        if (_queue.isNotEmpty && _currentIndex < _queue.length) {
+          _currentSong = _queue[_currentIndex];
+        }
+      }
+    } catch (e) {
+      print('❌ Error loading queue: $e');
+    }
+  }
+
+  // ✅ Updated load method including queue
+  Future<void> _loadSavedData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Load queue first
+      await _loadQueue();
+      
+      List<String>? recentPaths = prefs.getStringList('recent');
+      if (recentPaths != null && recentPaths.isNotEmpty) {
+        _recent = recentPaths
+            .where((path) => File(path).existsSync())
+            .map((path) => Song(path: path, name: path.split('/').last))
+            .toList();
+      }
+      
+      _isShuffle = prefs.getBool('isShuffle') ?? false;
+      _repeatMode = prefs.getInt('repeatMode') ?? 0;
+      _volume = prefs.getDouble('volume') ?? 1.0;
+      
+      String? playlistsJson = prefs.getString('playlists');
+      if (playlistsJson != null) {
+        Map<String, dynamic> decoded = jsonDecode(playlistsJson);
+        decoded.forEach((key, value) {
+          List<String> paths = List<String>.from(value);
+          _playlists[key] = paths
+              .where((path) => File(path).existsSync())
+              .map((path) => Song(path: path, name: path.split('/').last))
+              .toList();
+        });
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      print('❌ Error loading data: $e');
+    }
+  }
+
+  // ✅ Updated save method including queue
+  Future<void> _saveData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Save queue
+      await _saveQueue();
+      
+      List<String> recentPaths = _recent.map((s) => s.path).toList();
+      await prefs.setStringList('recent', recentPaths);
+      
+      await prefs.setBool('isShuffle', _isShuffle);
+      await prefs.setInt('repeatMode', _repeatMode);
+      await prefs.setDouble('volume', _volume);
+      
+      Map<String, List<String>> playlistMap = {};
+      _playlists.forEach((key, value) {
+        playlistMap[key] = value.map((s) => s.path).toList();
+      });
+      await prefs.setString('playlists', jsonEncode(playlistMap));
+      
+    } catch (e) {
+      print('❌ Error saving data: $e');
+    }
+  }
+}
 
   // ============================================================
   // QUEUE PERSISTENCE - FIX FOR SONGS DISAPPEARING
