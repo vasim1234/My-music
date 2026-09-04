@@ -27,35 +27,14 @@ class AudioManager {
     });
   }
 
-  // ✅ Toggle 3D Mode with Audio Effect
   Future<void> toggle3DMode() async {
     _is3DMode = !_is3DMode;
     print('🎵 3D Mode: ${_is3DMode ? "ON" : "OFF"}');
     
     if (_is3DMode) {
-      // ✅ Apply 3D Effect - Pan + Echo + Volume Boost
-      await _player.setPan(0.5); // Center
-      await _player.setVolume(1.2); // Slight boost
-      // Add reverb/echo effect using custom processing
-      // Note: just_audio doesn't have built-in reverb, so we use pan + volume
+      await _player.setVolume(1.3);
     } else {
-      // Reset to normal
-      await _player.setPan(0.0);
       await _player.setVolume(1.0);
-    }
-  }
-
-  // ✅ Apply 3D Effect Dynamically (call during playback)
-  Future<void> apply3DEffect() async {
-    if (_is3DMode) {
-      // Create 3D effect: alternating pan for spatial feel
-      // This creates a slight left-right movement
-      for (int i = 0; i < 10; i++) {
-        double panValue = (i % 2 == 0) ? -0.8 : 0.8;
-        await _player.setPan(panValue);
-        await Future.delayed(Duration(milliseconds: 200));
-      }
-      await _player.setPan(0.5); // Return to center
     }
   }
 
@@ -90,10 +69,8 @@ class AudioManager {
       await _player.stop();
       await _player.setAudioSource(AudioSource.file(path));
       
-      // ✅ Apply 3D effect if enabled
       if (_is3DMode) {
-        await _player.setPan(0.5);
-        await _player.setVolume(1.2);
+        await _player.setVolume(1.3);
       }
       
       await Future.delayed(const Duration(milliseconds: 300));
@@ -136,9 +113,8 @@ class AudioManager {
 
   Future<void> setVolume(double volume) async {
     print('🔊 Set volume: $volume');
-    // ✅ If 3D mode is on, boost volume slightly
     if (_is3DMode) {
-      await _player.setVolume(volume * 1.2);
+      await _player.setVolume(volume * 1.3);
     } else {
       await _player.setVolume(volume);
     }
