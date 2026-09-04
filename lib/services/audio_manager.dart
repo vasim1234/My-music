@@ -13,8 +13,8 @@ class AudioManager {
   bool _isPlaying = false;
 
   // ✅ FIXED: Correct stream types (non-nullable)
-  Stream<Duration> get positionStream => _player.positionStream;
-  Stream<Duration> get durationStream => _player.durationStream;
+  Stream<Duration?> get positionStream => _player.positionStream;
+  Stream<Duration?> get durationStream => _player.durationStream;
 
   bool get isPlaying => _isPlaying;
   String? get currentSong => _currentSongPath;
