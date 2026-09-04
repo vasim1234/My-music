@@ -186,6 +186,9 @@ class AudioManagerExtended extends ChangeNotifier {
   StreamSubscription<Duration?>? _durationSubscription;
   bool _isCompleting = false;
   
+  // ✅ Track if audio is prepared
+  bool _isAudioPrepared = false;
+  
   // ============================================================
   // GETTERS
   // ============================================================
@@ -218,9 +221,9 @@ class AudioManagerExtended extends ChangeNotifier {
     _setupStreams();
     _loadSavedData();
     
-    // ✅ FIX 1: Auto-play first song after loading
+    // ✅ FIX 1: Auto-play first song after loading with delay
     Future.delayed(const Duration(milliseconds: 500), () {
-      _autoPlayFirstSong();
+      _prepareFirstSong();
     });
   }
 
@@ -270,6 +273,7 @@ class AudioManagerExtended extends ChangeNotifier {
       } else {
         _status = PlaybackStatus.stopped;
         _currentSong = null;
+        _isAudioPrepared = false;
         notifyListeners();
         _saveData();
       }
@@ -277,18 +281,39 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // ✅ FIX 1: AUTO-PLAY FIRST SONG
+  // ✅ FIX 1: PREPARE FIRST SONG ON APP START
   // ============================================================
-  void _autoPlayFirstSong() {
-    if (_queue.isNotEmpty && _currentSong == null && _status == PlaybackStatus.stopped) {
-      print('🎵 Auto-playing first song from queue');
+  void _prepareFirstSong() {
+    if (_queue.isNotEmpty && _currentSong == null) {
+      print('🎵 Preparing first song from queue');
       _currentIndex = 0;
-      _playCurrent();
+      final song = _queue[_currentIndex];
+      _currentSong = song;
+      
+      // ✅ Pre-load audio source without playing
+      _preloadAudio(song);
+      
+      notifyListeners();
     }
   }
 
   // ============================================================
-  // ✅ FIX 2: STATE SYNC METHOD
+  // ✅ NEW: PRELOAD AUDIO (Prepare without playing)
+  // ============================================================
+  Future<void> _preloadAudio(Song song) async {
+    try {
+      print('📁 Preloading audio: ${song.displayName}');
+      await _audioManager.preload(song.path, song.displayName, song.artist);
+      _isAudioPrepared = true;
+      print('✅ Audio preloaded successfully');
+    } catch (e) {
+      print('❌ Failed to preload audio: $e');
+      _isAudioPrepared = false;
+    }
+  }
+
+  // ============================================================
+  // STATE SYNC METHOD
   // ============================================================
   void _updatePlaybackState(PlaybackStatus newStatus) {
     if (_status != newStatus) {
@@ -333,7 +358,9 @@ class AudioManagerExtended extends ChangeNotifier {
       _currentSong = song;
       print('📁 Loading audio file: ${song.path}');
       
+      // ✅ Play the song
       await _audioManager.playSong(song.path, song.displayName, song.artist);
+      _isAudioPrepared = true;
       _updatePlaybackState(PlaybackStatus.playing);
       print('✅ Audio loaded and playing');
       
@@ -350,6 +377,7 @@ class AudioManagerExtended extends ChangeNotifier {
       print('❌ Error playing song: $e');
       _updatePlaybackState(PlaybackStatus.stopped);
       _currentSong = null;
+      _isAudioPrepared = false;
       notifyListeners();
     }
   }
@@ -611,6 +639,7 @@ class AudioManagerExtended extends ChangeNotifier {
     
     _position = Duration.zero;
     _duration = Duration.zero;
+    _isAudioPrepared = false;
     
     await _playCurrent();
     _saveData();
@@ -627,11 +656,14 @@ class AudioManagerExtended extends ChangeNotifier {
     await Future.delayed(const Duration(milliseconds: 200));
     
     _currentIndex = (_currentIndex - 1 + _queue.length) % _queue.length;
+    _isAudioPrepared = false;
     await _playCurrent();
     _saveData();
   }
 
-  // ✅ FIX 4: UPDATED togglePlayPause
+  // ============================================================
+  // ✅ FIX 4: UPDATED togglePlayPause - WITH AUDIO PREPARED CHECK
+  // ============================================================
   Future<void> togglePlayPause() async {
     if (_queue.isEmpty) {
       print('⚠️ Queue is empty, cannot toggle play/pause');
@@ -640,12 +672,22 @@ class AudioManagerExtended extends ChangeNotifier {
     
     print('🔄 Toggle play/pause called. Current status: $_status');
     print('📌 Current song: ${_currentSong?.displayName ?? "null"}');
+    print('📌 Audio prepared: $_isAudioPrepared');
     
-    // ✅ FIX: If no current song, play the first song in queue
+    // ✅ FIX: If no current song, play first song
     if (_currentSong == null && _queue.isNotEmpty) {
       print('▶️ No current song, playing first song from queue...');
       _currentIndex = 0;
       await _playCurrent();
+      return;
+    }
+    
+    // ✅ FIX: If audio is not prepared, prepare it
+    if (_currentSong != null && !_isAudioPrepared) {
+      print('▶️ Audio not prepared, preparing now...');
+      await _preloadAudio(_currentSong!);
+      await _audioManager.play();
+      _updatePlaybackState(PlaybackStatus.playing);
       return;
     }
     
@@ -713,6 +755,7 @@ class AudioManagerExtended extends ChangeNotifier {
     _status = PlaybackStatus.stopped;
     _position = Duration.zero;
     _duration = Duration.zero;
+    _isAudioPrepared = false;
     _saveData();
     notifyListeners();
   }
@@ -731,6 +774,7 @@ class AudioManagerExtended extends ChangeNotifier {
     if (_queue.isEmpty) {
       _currentSong = null;
       _status = PlaybackStatus.stopped;
+      _isAudioPrepared = false;
     }
     _saveData();
     notifyListeners();
@@ -2445,7 +2489,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     final currentSong = _audioManager.currentSong;
     final isPlaying = _audioManager.isPlaying;
     final currentIndex = _audioManager.currentIndex;
-    final status = _audioManager.status;
     
     String currentSongName = currentSong?.displayName ?? "No song playing";
     bool hasSongs = queue.isNotEmpty;
