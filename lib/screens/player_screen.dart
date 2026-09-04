@@ -157,7 +157,7 @@ class Song {
 }
 
 // ============================================================
-// AUDIO MANAGER EXTENDED - COMPLETE
+// AUDIO MANAGER EXTENDED - FIXED
 // ============================================================
 enum PlaybackStatus { stopped, playing, paused }
 
@@ -175,10 +175,18 @@ class AudioManagerExtended extends ChangeNotifier {
   bool _isShuffle = false;
   int _repeatMode = 0;
   
+  // ✅ QUEUE - Current playing songs (separate from playlists)
   List<Song> _queue = [];
   int _currentIndex = 0;
+  
+  // ✅ MASTER LIST - All songs from phone (PERMANENT)
+  List<Song> _masterList = [];
+  
+  // ✅ RECENT & FAVORITES
   List<Song> _recent = [];
   List<Song> _favorites = [];
+  
+  // ✅ PLAYLISTS - Separate from queue (DOES NOT AFFECT QUEUE)
   Map<String, List<Song>> _playlists = {};
   
   StreamSubscription<Duration?>? _positionSubscription;
@@ -199,6 +207,7 @@ class AudioManagerExtended extends ChangeNotifier {
   bool get isShuffle => _isShuffle;
   int get repeatMode => _repeatMode;
   List<Song> get queue => _queue;
+  List<Song> get masterList => _masterList;
   int get currentIndex => _currentIndex;
   List<Song> get recent => _recent;
   List<Song> get favorites => _favorites;
@@ -364,17 +373,50 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
+  // MASTER LIST - PERMANENT SONGS
+  // ============================================================
+  void addToMasterList(List<Song> songs) {
+    for (var song in songs) {
+      if (!_masterList.contains(song)) {
+        _masterList.add(song);
+      }
+    }
+    _saveData();
+    notifyListeners();
+  }
+
+  // ============================================================
   // SAVE/LOAD DATA
   // ============================================================
   Future<void> _loadSavedData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
+      // Load queue
       await _loadQueue();
       
+      // Load master list
+      List<String>? masterPaths = prefs.getStringList('masterList');
+      if (masterPaths != null && masterPaths.isNotEmpty) {
+        _masterList = masterPaths
+            .where((path) => File(path).existsSync())
+            .map((path) => Song(path: path, name: path.split('/').last))
+            .toList();
+      }
+      
+      // Load recent
       List<String>? recentPaths = prefs.getStringList('recent');
       if (recentPaths != null && recentPaths.isNotEmpty) {
         _recent = recentPaths
+            .where((path) => File(path).existsSync())
+            .map((path) => Song(path: path, name: path.split('/').last))
+            .toList();
+      }
+      
+      // Load favorites
+      List<String>? favoritePaths = prefs.getStringList('favorites');
+      if (favoritePaths != null && favoritePaths.isNotEmpty) {
+        _favorites = favoritePaths
             .where((path) => File(path).existsSync())
             .map((path) => Song(path: path, name: path.split('/').last))
             .toList();
@@ -384,11 +426,13 @@ class AudioManagerExtended extends ChangeNotifier {
       _repeatMode = prefs.getInt('repeatMode') ?? 0;
       _volume = prefs.getDouble('volume') ?? 1.0;
       
+      // ✅ Load playlists (SEPARATE from queue)
       String? playlistsJson = prefs.getString('playlists');
       if (playlistsJson != null) {
         Map<String, dynamic> decoded = jsonDecode(playlistsJson);
         decoded.forEach((key, value) {
           List<String> paths = List<String>.from(value);
+          // ✅ Create playlist from master list - DOES NOT MODIFY QUEUE
           _playlists[key] = paths
               .where((path) => File(path).existsSync())
               .map((path) => Song(path: path, name: path.split('/').last))
@@ -406,15 +450,26 @@ class AudioManagerExtended extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       
+      // Save queue
       await _saveQueue();
       
+      // Save master list
+      List<String> masterPaths = _masterList.map((s) => s.path).toList();
+      await prefs.setStringList('masterList', masterPaths);
+      
+      // Save recent
       List<String> recentPaths = _recent.map((s) => s.path).toList();
       await prefs.setStringList('recent', recentPaths);
+      
+      // Save favorites
+      List<String> favoritePaths = _favorites.map((s) => s.path).toList();
+      await prefs.setStringList('favorites', favoritePaths);
       
       await prefs.setBool('isShuffle', _isShuffle);
       await prefs.setInt('repeatMode', _repeatMode);
       await prefs.setDouble('volume', _volume);
       
+      // ✅ Save playlists (SEPARATE)
       Map<String, List<String>> playlistMap = {};
       _playlists.forEach((key, value) {
         playlistMap[key] = value.map((s) => s.path).toList();
@@ -427,7 +482,7 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // PUBLIC METHODS - PLAYLIST
+  // ✅ PLAYLIST METHODS - DOES NOT AFFECT QUEUE
   // ============================================================
   
   void createPlaylist(String name) {
@@ -435,7 +490,7 @@ class AudioManagerExtended extends ChangeNotifier {
       _playlists[name.trim()] = [];
       _saveData();
       notifyListeners();
-      print('✅ Playlist created: $name');
+      print('✅ Playlist created: $name (Queue unchanged)');
     }
   }
 
@@ -486,7 +541,7 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // PUBLIC METHODS - PLAYBACK
+  // ✅ PUBLIC METHODS - PLAYBACK
   // ============================================================
   
   Future<void> playSong(Song song, {List<Song>? queue}) async {
@@ -556,9 +611,15 @@ class AudioManagerExtended extends ChangeNotifier {
     } else {
       _favorites.add(song);
     }
+    // Update in queue
     final queueIndex = _queue.indexOf(song);
     if (queueIndex != -1) {
       _queue[queueIndex] = song.copyWith(isFavorite: !song.isFavorite);
+    }
+    // Update in master list
+    final masterIndex = _masterList.indexOf(song);
+    if (masterIndex != -1) {
+      _masterList[masterIndex] = _masterList[masterIndex].copyWith(isFavorite: !_masterList[masterIndex].isFavorite);
     }
     _saveData();
     notifyListeners();
@@ -614,6 +675,13 @@ class AudioManagerExtended extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ============================================================
+  // SHOW CURRENT QUEUE - For Queue Button
+  // ============================================================
+  List<Song> getCurrentQueue() {
+    return List.from(_queue);
+  }
+
   @override
   void dispose() {
     _positionSubscription?.cancel();
@@ -634,7 +702,6 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
-  // ✅ AudioManagerExtended instance
   late AudioManagerExtended _audioManager;
   
   int _selectedTab = 0;
@@ -778,12 +845,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           name: file.name,
         )).toList();
         
+        // ✅ Add to master list (PERMANENT)
+        _audioManager.addToMasterList(songs);
+        
         if (_audioManager.queue.isEmpty) {
           await _audioManager.playSong(songs.first, queue: songs);
         } else {
-          for (var song in songs) {
-            _audioManager.queue.add(song);
-          }
+          _audioManager.addSongsToQueue(songs);
           setState(() {});
         }
         
@@ -803,6 +871,244 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         ),
       );
     }
+  }
+
+  // ============================================================
+  // SHOW CURRENT QUEUE - Queue Button
+  // ============================================================
+  void _showCurrentQueue() {
+    final queue = _audioManager.getCurrentQueue();
+    final currentIndex = _audioManager.currentIndex;
+    
+    if (queue.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Queue is empty. Add some songs first!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppConstants.bgColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              height: MediaQuery.of(context).size.height * 0.7,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: AppConstants.secondaryGradient,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.queue_music,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Current Queue (${queue.length})',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white70),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Colors.white24),
+                  const SizedBox(height: 8),
+                  
+                  // Queue List
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: queue.length,
+                      itemBuilder: (context, index) {
+                        final song = queue[index];
+                        final isCurrent = index == currentIndex;
+                        final isFavorite = _audioManager.favorites.contains(song);
+                        List<Color> gradient = AppHelpers.getSongGradient(index);
+                        
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          decoration: BoxDecoration(
+                            color: isCurrent 
+                                ? AppConstants.accentColor.withOpacity(0.15)
+                                : AppConstants.cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: isCurrent 
+                                ? Border.all(color: AppConstants.accentColor, width: 1.5)
+                                : null,
+                          ),
+                          child: ListTile(
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(colors: gradient),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  song.firstLetter,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              song.displayName,
+                              style: TextStyle(
+                                color: isCurrent ? AppConstants.accentColor : Colors.white,
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              isCurrent ? '▶ Now Playing' : song.artist,
+                              style: TextStyle(
+                                color: isCurrent ? AppConstants.accentColor : AppConstants.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isCurrent)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppConstants.accentColor.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'NOW',
+                                      style: TextStyle(
+                                        color: AppConstants.accentColor,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                IconButton(
+                                  icon: Icon(
+                                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    color: isFavorite ? Colors.red : Colors.white54,
+                                    size: 18,
+                                  ),
+                                  onPressed: () {
+                                    _audioManager.toggleFavorite(song);
+                                    setModalState(() {});
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.close,
+                                    color: Colors.white54,
+                                    size: 18,
+                                  ),
+                                  onPressed: () {
+                                    _audioManager.removeFromQueue(song);
+                                    setModalState(() {});
+                                  },
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              _audioManager.playSong(song);
+                              Navigator.pop(context);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  
+                  // Bottom Actions
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () {
+                          _audioManager.clearQueue();
+                          setModalState(() {});
+                          Navigator.pop(context);
+                        },
+                        icon: const Icon(Icons.clear_all, color: Colors.red, size: 18),
+                        label: const Text(
+                          'Clear Queue',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                      Container(
+                        height: 35,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: AppConstants.primaryGradient,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            final shuffled = List.from(queue)..shuffle();
+                            _audioManager.clearQueue();
+                            _audioManager.addSongsToQueue(shuffled);
+                            setModalState(() {});
+                          },
+                          icon: const Icon(Icons.shuffle, color: Colors.white, size: 16),
+                          label: const Text(
+                            'Shuffle',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   // ============================================================
@@ -1617,14 +1923,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   void _showAddToPlaylistDialog(String playlistName) {
-    List<Song> availableSongs = _audioManager.queue.where((song) =>
+    // ✅ Use master list for available songs
+    List<Song> availableSongs = _audioManager.masterList.where((song) =>
       !_audioManager.playlists[playlistName]!.contains(song)
     ).toList();
 
-    if (_audioManager.queue.isEmpty) {
+    if (_audioManager.masterList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('❌ No songs in queue. Add songs first!'),
+          content: Text('❌ No songs in master list. Add songs first!'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -1716,9 +2023,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                           ),
                           child: ElevatedButton(
                             onPressed: () {
-                              for (var song in selectedSongs) {
-                                _audioManager.addToPlaylist(playlistName, song);
-                              }
+                              _audioManager.addSongsToPlaylist(playlistName, selectedSongs);
                               setState(() {});
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -1893,7 +2198,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   Widget _buildPlaylistsTab() {
     final playlists = _audioManager.playlists;
-    final queue = _audioManager.queue;
+    final masterList = _audioManager.masterList;
     
     return Column(
       children: [
@@ -1925,6 +2230,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             itemCount: playlists.keys.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) {
+                // ✅ All Songs - From Master List (PERMANENT)
                 return Card(
                   color: AppConstants.cardColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1945,7 +2251,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       ],
                     ),
                     subtitle: Text(
-                      '${queue.length} songs',
+                      '${masterList.length} songs',
                       style: const TextStyle(color: AppConstants.textSecondary),
                     ),
                     leading: Container(
@@ -1956,17 +2262,17 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       ),
                       child: const Icon(Icons.library_music, color: Colors.white),
                     ),
-                    children: queue.isEmpty
+                    children: masterList.isEmpty
                         ? [
                             const Padding(
                               padding: EdgeInsets.all(16),
                               child: Text(
-                                'No songs in queue. Add songs from Player screen!',
+                                'No songs in master list. Add songs from Player screen!',
                                 style: TextStyle(color: Colors.white54),
                               ),
                             ),
                           ]
-                        : queue.asMap().entries.map((entry) {
+                        : masterList.asMap().entries.map((entry) {
                             return _buildSongListItem(entry.value, entry.key);
                           }).toList(),
                   ),
@@ -2046,7 +2352,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                     onPressed: () => _showAddToPlaylistDialog(playlistName),
                                     icon: const Icon(Icons.add, size: 16, color: Colors.white),
                                     label: const Text(
-                                      'Add Songs from Queue',
+                                      'Add Songs from Master List',
                                       style: TextStyle(color: Colors.white),
                                     ),
                                     style: ElevatedButton.styleFrom(
@@ -2077,356 +2383,333 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-// PLAYER UI - EXACT DESIGN
-// ============================================================
-Widget _buildPlayerUI() {
-  final queue = _audioManager.queue;
-  final currentSong = _audioManager.currentSong;
-  final isPlaying = _audioManager.isPlaying;
-  final currentIndex = _audioManager.currentIndex;
-  
-  String currentSongName = currentSong?.displayName ?? "No song playing";
-  bool hasSongs = queue.isNotEmpty;
-  List<Color> currentGradient = hasSongs 
-      ? AppHelpers.getSongGradient(currentIndex)
-      : AppConstants.primaryGradient;
+  // PLAYER UI
+  // ============================================================
+  Widget _buildPlayerUI() {
+    final queue = _audioManager.queue;
+    final currentSong = _audioManager.currentSong;
+    final isPlaying = _audioManager.isPlaying;
+    final currentIndex = _audioManager.currentIndex;
+    
+    String currentSongName = currentSong?.displayName ?? "No song playing";
+    bool hasSongs = queue.isNotEmpty;
+    List<Color> currentGradient = hasSongs 
+        ? AppHelpers.getSongGradient(currentIndex)
+        : AppConstants.primaryGradient;
 
-  return SafeArea(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // ============================================================
-          // SONG INFO - CENTER ALIGNED
-          // ============================================================
-          Column(
-            children: [
-              Text(
-                currentSongName,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                currentSong?.artist ?? "Luna Echo",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppConstants.textSecondary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 30),
-          
-          // ============================================================
-          // ALBUM ART
-          // ============================================================
-          AlbumArt(
-            isPlaying: isPlaying,
-            is3DMode: _is3DMode,
-            songName: currentSongName,
-            songPath: currentSong?.path,
-            gradient: currentGradient,
-            isSleepTimerActive: _sleepTimerActive,
-            animation: _pulseAnimation,
-            accentColor: AppConstants.accentColor,
-          ),
-          
-          const SizedBox(height: 30),
-          
-          // ============================================================
-          // PROGRESS BAR
-          // ============================================================
-          Column(
-            children: [
-              SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 3,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                  activeTrackColor: AppConstants.accentColor,
-                  inactiveTrackColor: Colors.grey.shade800,
-                  thumbColor: AppConstants.accentColor,
-                ),
-                child: Slider(
-                  min: 0.0,
-                  max: _audioManager.duration.inSeconds.toDouble() > 0 
-                      ? _audioManager.duration.inSeconds.toDouble() 
-                      : 1.0,
-                  value: _audioManager.position.inSeconds.toDouble().clamp(
-                      0.0, 
-                      _audioManager.duration.inSeconds.toDouble() > 0 
-                          ? _audioManager.duration.inSeconds.toDouble() 
-                          : 1.0
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // SONG INFO - CENTER ALIGNED
+            Column(
+              children: [
+                Text(
+                  currentSongName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
-                  onChanged: (value) async {
-                    final position = Duration(seconds: value.toInt());
-                    await _audioManager.seek(position);
-                  },
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    AppHelpers.formatDuration(_audioManager.position),
-                    style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
+                const SizedBox(height: 4),
+                Text(
+                  currentSong?.artist ?? "Luna Echo",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppConstants.textSecondary,
                   ),
-                  Text(
-                    AppHelpers.formatDuration(_audioManager.duration),
-                    style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 30),
+            
+            // ALBUM ART
+            AlbumArt(
+              isPlaying: isPlaying,
+              is3DMode: _is3DMode,
+              songName: currentSongName,
+              songPath: currentSong?.path,
+              gradient: currentGradient,
+              isSleepTimerActive: _sleepTimerActive,
+              animation: _pulseAnimation,
+              accentColor: AppConstants.accentColor,
+            ),
+            
+            const SizedBox(height: 30),
+            
+            // PROGRESS BAR
+            Column(
+              children: [
+                SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                    activeTrackColor: AppConstants.accentColor,
+                    inactiveTrackColor: Colors.grey.shade800,
+                    thumbColor: AppConstants.accentColor,
                   ),
-                ],
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // ============================================================
-          // PLAYBACK CONTROLS - WITH REPEAT & QUEUE BUTTONS
-          // ============================================================
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // LEFT: Repeat/Loop Button
-              GestureDetector(
-                onTap: _showShuffleRepeatMenu,
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: _audioManager.repeatMode != 0 
-                        ? AppConstants.accentColor.withOpacity(0.15)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Icon(
-                    _audioManager.repeatMode == 0 ? Icons.repeat_outlined :
-                    _audioManager.repeatMode == 1 ? Icons.repeat_one :
-                    Icons.repeat,
-                    color: _audioManager.repeatMode != 0 
-                        ? AppConstants.accentColor 
-                        : Colors.white54,
-                    size: 22,
+                  child: Slider(
+                    min: 0.0,
+                    max: _audioManager.duration.inSeconds.toDouble() > 0 
+                        ? _audioManager.duration.inSeconds.toDouble() 
+                        : 1.0,
+                    value: _audioManager.position.inSeconds.toDouble().clamp(
+                        0.0, 
+                        _audioManager.duration.inSeconds.toDouble() > 0 
+                            ? _audioManager.duration.inSeconds.toDouble() 
+                            : 1.0
+                    ),
+                    onChanged: (value) async {
+                      final position = Duration(seconds: value.toInt());
+                      await _audioManager.seek(position);
+                    },
                   ),
                 ),
-              ),
-              
-              const SizedBox(width: 20),
-              
-              // PREVIOUS BUTTON
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 28),
-                  onPressed: hasSongs ? () => _audioManager.playPrevious() : null,
-                  padding: const EdgeInsets.all(12),
-                ),
-              ),
-              
-              const SizedBox(width: 8),
-              
-              // PLAY/PAUSE BUTTON - PROMINENT
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: currentGradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppConstants.accentColor.withOpacity(0.4),
-                      blurRadius: 25,
-                      spreadRadius: 5,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      AppHelpers.formatDuration(_audioManager.position),
+                      style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
+                    ),
+                    Text(
+                      AppHelpers.formatDuration(_audioManager.duration),
+                      style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
                     ),
                   ],
                 ),
-                child: IconButton(
-                  icon: Icon(
-                    isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.white,
-                    size: 36,
+              ],
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // PLAYBACK CONTROLS - WITH REPEAT & QUEUE BUTTONS
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // LEFT: Repeat/Loop Button
+                GestureDetector(
+                  onTap: _showShuffleRepeatMenu,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _audioManager.repeatMode != 0 
+                          ? AppConstants.accentColor.withOpacity(0.15)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Icon(
+                      _audioManager.repeatMode == 0 ? Icons.repeat_outlined :
+                      _audioManager.repeatMode == 1 ? Icons.repeat_one :
+                      Icons.repeat,
+                      color: _audioManager.repeatMode != 0 
+                          ? AppConstants.accentColor 
+                          : Colors.white54,
+                      size: 22,
+                    ),
                   ),
-                  onPressed: () => _audioManager.togglePlayPause(),
-                  padding: const EdgeInsets.all(18),
                 ),
-              ),
-              
-              const SizedBox(width: 8),
-              
-              // NEXT BUTTON
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 28),
-                  onPressed: hasSongs ? () => _audioManager.playNext() : null,
-                  padding: const EdgeInsets.all(12),
-                ),
-              ),
-              
-              const SizedBox(width: 20),
-              
-              // RIGHT: Queue/Playlist Button
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedTab = 3; // Switch to Playlists tab
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(10),
+                
+                const SizedBox(width: 20),
+                
+                // PREVIOUS BUTTON
+                Container(
                   decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.05),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.skip_previous, color: Colors.white, size: 28),
+                    onPressed: hasSongs ? () => _audioManager.playPrevious() : null,
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+                
+                const SizedBox(width: 8),
+                
+                // PLAY/PAUSE BUTTON - PROMINENT
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: AppConstants.secondaryGradient,
+                      colors: currentGradient,
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppConstants.accentColor.withOpacity(0.4),
+                        blurRadius: 25,
+                        spreadRadius: 5,
+                      ),
+                    ],
                   ),
-                  child: const Icon(
-                    Icons.queue_music,
-                    color: Colors.white,
-                    size: 22,
+                  child: IconButton(
+                    icon: Icon(
+                      isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                    onPressed: () => _audioManager.togglePlayPause(),
+                    padding: const EdgeInsets.all(18),
                   ),
                 ),
-              ),
-            ],
+                
+                const SizedBox(width: 8),
+                
+                // NEXT BUTTON
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.05),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.skip_next, color: Colors.white, size: 28),
+                    onPressed: hasSongs ? () => _audioManager.playNext() : null,
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+                
+                const SizedBox(width: 20),
+                
+                // ✅ RIGHT: Queue Button - Shows Current Queue
+                GestureDetector(
+                  onTap: _showCurrentQueue,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: AppConstants.secondaryGradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: const Icon(
+                      Icons.queue_music,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 30),
+            
+            // BOTTOM UTILITY ROW
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildUtilityButton(
+                  icon: Icons.three_mp,
+                  label: '3D',
+                  isActive: _is3DMode,
+                  activeColor: Colors.purple,
+                  onTap: () {
+                    setState(() {
+                      _is3DMode = !_is3DMode;
+                    });
+                  },
+                ),
+                _buildUtilityButton(
+                  icon: Icons.equalizer,
+                  label: 'EQ',
+                  isActive: _isEqActive,
+                  activeColor: AppConstants.accentColor,
+                  onTap: _showEqualizerDialog,
+                ),
+                _buildUtilityButton(
+                  icon: Icons.volume_up,
+                  label: 'Volume',
+                  isActive: false,
+                  activeColor: Colors.white,
+                  onTap: _showVolumePopup,
+                ),
+                _buildUtilityButton(
+                  icon: currentSong != null && _audioManager.favorites.contains(currentSong) 
+                      ? Icons.favorite 
+                      : Icons.favorite_border,
+                  label: 'Heart',
+                  isActive: currentSong != null && _audioManager.favorites.contains(currentSong),
+                  activeColor: Colors.red,
+                  onTap: () {
+                    if (currentSong != null) {
+                      _audioManager.toggleFavorite(currentSong);
+                      setState(() {});
+                    }
+                  },
+                ),
+                _buildUtilityButton(
+                  icon: Icons.timer,
+                  label: 'Timer',
+                  isActive: _sleepTimerActive,
+                  activeColor: AppConstants.warningColor,
+                  onTap: _showSleepTimerDialog,
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // UTILITY BUTTON
+  // ============================================================
+  Widget _buildUtilityButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required Color activeColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isActive ? activeColor.withOpacity(0.15) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: isActive 
+                  ? Border.all(color: activeColor.withOpacity(0.5), width: 1.5)
+                  : null,
+            ),
+            child: Icon(
+              icon,
+              color: isActive ? activeColor : Colors.white54,
+              size: 22,
+            ),
           ),
-          
-          const SizedBox(height: 30),
-          
-          // ============================================================
-          // BOTTOM UTILITY ROW - 3D, EQ, Volume, Heart, Timer
-          // ============================================================
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // 3D Audio
-              _buildUtilityButton(
-                icon: Icons.three_mp,
-                label: '3D',
-                isActive: _is3DMode,
-                activeColor: Colors.purple,
-                onTap: () {
-                  setState(() {
-                    _is3DMode = !_is3DMode;
-                  });
-                },
-              ),
-              
-              // EQ (Equalizer)
-              _buildUtilityButton(
-                icon: Icons.equalizer,
-                label: 'EQ',
-                isActive: _isEqActive,
-                activeColor: AppConstants.accentColor,
-                onTap: _showEqualizerDialog,
-              ),
-              
-              // Volume
-              _buildUtilityButton(
-                icon: Icons.volume_up,
-                label: 'Volume',
-                isActive: false,
-                activeColor: Colors.white,
-                onTap: _showVolumePopup,
-              ),
-              
-              // Heart / Favorite
-              _buildUtilityButton(
-                icon: currentSong != null && _audioManager.favorites.contains(currentSong) 
-                    ? Icons.favorite 
-                    : Icons.favorite_border,
-                label: 'Heart',
-                isActive: currentSong != null && _audioManager.favorites.contains(currentSong),
-                activeColor: Colors.red,
-                onTap: () {
-                  if (currentSong != null) {
-                    _audioManager.toggleFavorite(currentSong);
-                    setState(() {});
-                  }
-                },
-              ),
-              
-              // Timer
-              _buildUtilityButton(
-                icon: Icons.timer,
-                label: 'Timer',
-                isActive: _sleepTimerActive,
-                activeColor: AppConstants.warningColor,
-                onTap: _showSleepTimerDialog,
-              ),
-            ],
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: isActive ? activeColor : AppConstants.textSecondary,
+              fontSize: 10,
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            ),
           ),
-          
-          const SizedBox(height: 16),
         ],
       ),
-    ),
-  );
-}
-
-// ============================================================
-// UTILITY BUTTON - For bottom row
-// ============================================================
-Widget _buildUtilityButton({
-  required IconData icon,
-  required String label,
-  required bool isActive,
-  required Color activeColor,
-  required VoidCallback onTap,
-}) {
-  return GestureDetector(
-    onTap: onTap,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor.withOpacity(0.15) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: isActive 
-                ? Border.all(color: activeColor.withOpacity(0.5), width: 1.5)
-                : null,
-          ),
-          child: Icon(
-            icon,
-            color: isActive ? activeColor : Colors.white54,
-            size: 22,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: isActive ? activeColor : AppConstants.textSecondary,
-            fontSize: 10,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
   // ============================================================
   // BODY CONTENT
