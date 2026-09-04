@@ -26,6 +26,28 @@ class AudioManager {
     });
   }
 
+  // ✅ ADDED: Preload Method for Instant Play Preparation
+  Future<void> preload(String path, String title, String artist) async {
+    try {
+      print('🎵 Preloading: $title');
+      print('📁 Path: $path');
+
+      final file = File(path);
+      if (!await file.exists()) {
+        print('❌ File not found for preloading');
+        return;
+      }
+
+      await _player.stop();
+      await _player.setAudioSource(AudioSource.file(path));
+      _currentSongPath = path;
+      _isPlaying = false;
+      print('✅ Preload complete: $title');
+    } catch (e) {
+      print('❌ Preload Error: $e');
+    }
+  }
+
   Future<void> playSong(String path, String title, String artist) async {
     try {
       print('🎵 PlaySong: $title');
