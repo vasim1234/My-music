@@ -178,9 +178,10 @@ class AudioManagerExtended extends ChangeNotifier {
   List<Song> _favorites = [];
   Map<String, List<Song>> _playlists = {};
   
-  // ✅ FIXED: Use nullable Duration for streams
   StreamSubscription<Duration?>? _positionSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
+  
+  bool _isCompleting = false;
   
   PlaybackStatus get status => _status;
   Song? get currentSong => _currentSong;
@@ -213,6 +214,7 @@ class AudioManagerExtended extends ChangeNotifier {
       if (position != null) {
         _position = position;
         notifyListeners();
+        _checkSongCompletion();
       }
     });
 
@@ -222,6 +224,21 @@ class AudioManagerExtended extends ChangeNotifier {
         notifyListeners();
       }
     });
+  }
+
+  void _checkSongCompletion() {
+    if (_status == PlaybackStatus.playing && 
+        _duration.inSeconds > 0 && 
+        _position.inSeconds >= _duration.inSeconds - 1 &&
+        !_isCompleting) {
+      
+      _isCompleting = true;
+      _onSongComplete();
+      
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _isCompleting = false;
+      });
+    }
   }
 
   void _onSongComplete() {
@@ -234,7 +251,9 @@ class AudioManagerExtended extends ChangeNotifier {
         _playNext();
       } else {
         _status = PlaybackStatus.stopped;
+        _currentSong = null;
         notifyListeners();
+        _saveData();
       }
     }
   }
@@ -249,6 +268,7 @@ class AudioManagerExtended extends ChangeNotifier {
         _currentIndex = _queue.isNotEmpty ? _queue.length - 1 : 0;
       }
       notifyListeners();
+      _saveData();
       return;
     }
 
@@ -263,7 +283,9 @@ class AudioManagerExtended extends ChangeNotifier {
       
       _queue[_currentIndex] = song.copyWith(lastPlayed: DateTime.now());
       
+      _isCompleting = false;
       notifyListeners();
+      _saveData();
     } catch (e) {
       _status = PlaybackStatus.stopped;
       notifyListeners();
@@ -281,18 +303,61 @@ class AudioManagerExtended extends ChangeNotifier {
       int newIndex;
       do {
         newIndex = DateTime.now().millisecondsSinceEpoch % _queue.length;
-      } while (newIndex == _currentIndex);
+      } while (newIndex == _currentIndex && _queue.length > 1);
       _currentIndex = newIndex;
     } else {
       _currentIndex = (_currentIndex + 1) % _queue.length;
     }
     
+    _isCompleting = false;
     await _playCurrent();
+  }
+
+  // ============================================================
+  // QUEUE PERSISTENCE - FIX FOR SONGS DISAPPEARING
+  // ============================================================
+  
+  Future<void> _saveQueue() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      List<String> queuePaths = _queue.map((s) => s.path).toList();
+      await prefs.setStringList('queue', queuePaths);
+      await prefs.setInt('currentIndex', _currentIndex);
+    } catch (e) {
+      print('❌ Error saving queue: $e');
+    }
+  }
+
+  Future<void> _loadQueue() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      List<String>? queuePaths = prefs.getStringList('queue');
+      if (queuePaths != null && queuePaths.isNotEmpty) {
+        _queue = queuePaths
+            .where((path) => File(path).existsSync())
+            .map((path) => Song(path: path, name: path.split('/').last))
+            .toList();
+        
+        _currentIndex = prefs.getInt('currentIndex') ?? 0;
+        if (_currentIndex >= _queue.length) {
+          _currentIndex = _queue.isNotEmpty ? _queue.length - 1 : 0;
+        }
+        
+        if (_queue.isNotEmpty && _currentIndex < _queue.length) {
+          _currentSong = _queue[_currentIndex];
+        }
+      }
+    } catch (e) {
+      print('❌ Error loading queue: $e');
+    }
   }
 
   Future<void> _loadSavedData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      
+      await _loadQueue();
       
       List<String>? recentPaths = prefs.getStringList('recent');
       if (recentPaths != null && recentPaths.isNotEmpty) {
@@ -328,6 +393,8 @@ class AudioManagerExtended extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       
+      await _saveQueue();
+      
       List<String> recentPaths = _recent.map((s) => s.path).toList();
       await prefs.setStringList('recent', recentPaths);
       
@@ -346,7 +413,10 @@ class AudioManagerExtended extends ChangeNotifier {
     }
   }
 
-  // Public methods
+  // ============================================================
+  // PUBLIC METHODS
+  // ============================================================
+  
   Future<void> playSong(Song song, {List<Song>? queue}) async {
     if (queue != null && queue.isNotEmpty) {
       _queue = List.from(queue);
@@ -485,6 +555,12 @@ class AudioManagerExtended extends ChangeNotifier {
     _status = PlaybackStatus.stopped;
     _position = Duration.zero;
     _duration = Duration.zero;
+    _saveData();
+    notifyListeners();
+  }
+
+  void addSongsToQueue(List<Song> songs) {
+    _queue.addAll(songs);
     _saveData();
     notifyListeners();
   }
