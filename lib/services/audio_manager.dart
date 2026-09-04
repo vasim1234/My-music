@@ -26,14 +26,6 @@ class AudioManager {
       print('State: ${state.processingState}, playing: ${state.playing}');
     });
   }
-
-  // ============================================================
-// 3D MODE TOGGLE
-// ============================================================
-
-Future<void> toggle3DMode() async {
-  await _audioManager.toggle3DMode();
-}
     
     if (_is3DMode) {
       await _player.setVolume(1.3);
