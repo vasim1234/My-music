@@ -874,242 +874,243 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // SHOW CURRENT QUEUE - Queue Button
-  // ============================================================
-  void _showCurrentQueue() {
-    final queue = _audioManager.getCurrentQueue();
-    final currentIndex = _audioManager.currentIndex;
-    
-    if (queue.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Queue is empty. Add some songs first!'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-    
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppConstants.bgColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+// SHOW CURRENT QUEUE - Queue Button 
+// ============================================================
+void _showCurrentQueue() {
+  final queue = _audioManager.getCurrentQueue();
+  final currentIndex = _audioManager.currentIndex;
+  
+  if (queue.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Queue is empty. Add some songs first!'),
+        backgroundColor: Colors.orange,
       ),
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.all(20),
-              height: MediaQuery.of(context).size.height * 0.7,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
+    );
+    return;
+  }
+  
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: AppConstants.bgColor,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    isScrollControlled: true,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: AppConstants.secondaryGradient,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.queue_music,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Current Queue (${queue.length})',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white70),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const Divider(color: Colors.white24),
+                const SizedBox(height: 8),
+                
+                // Queue List
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: queue.length,
+                    itemBuilder: (context, index) {
+                      final song = queue[index];
+                      final isCurrent = index == currentIndex;
+                      final isFavorite = _audioManager.favorites.contains(song);
+                      List<Color> gradient = AppHelpers.getSongGradient(index);
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        decoration: BoxDecoration(
+                          color: isCurrent 
+                              ? AppConstants.accentColor.withOpacity(0.15)
+                              : AppConstants.cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: isCurrent 
+                              ? Border.all(color: AppConstants.accentColor, width: 1.5)
+                              : null,
+                        ),
+                        child: ListTile(
+                          leading: Container(
+                            width: 40,
+                            height: 40,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: AppConstants.secondaryGradient,
-                              ),
+                              gradient: LinearGradient(colors: gradient),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(
-                              Icons.queue_music,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Current Queue (${queue.length})',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white70),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                  const Divider(color: Colors.white24),
-                  const SizedBox(height: 8),
-                  
-                  // Queue List
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: queue.length,
-                      itemBuilder: (context, index) {
-                        final song = queue[index];
-                        final isCurrent = index == currentIndex;
-                        final isFavorite = _audioManager.favorites.contains(song);
-                        List<Color> gradient = AppHelpers.getSongGradient(index);
-                        
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          decoration: BoxDecoration(
-                            color: isCurrent 
-                                ? AppConstants.accentColor.withOpacity(0.15)
-                                : AppConstants.cardColor,
-                            borderRadius: BorderRadius.circular(12),
-                            border: isCurrent 
-                                ? Border.all(color: AppConstants.accentColor, width: 1.5)
-                                : null,
-                          ),
-                          child: ListTile(
-                            leading: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(colors: gradient),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  song.firstLetter,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                            child: Center(
+                              child: Text(
+                                song.firstLetter,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
-                            title: Text(
-                              song.displayName,
-                              style: TextStyle(
-                                color: isCurrent ? AppConstants.accentColor : Colors.white,
-                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          ),
+                          title: Text(
+                            song.displayName,
+                            style: TextStyle(
+                              color: isCurrent ? AppConstants.accentColor : Colors.white,
+                              fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                             ),
-                            subtitle: Text(
-                              isCurrent ? '▶ Now Playing' : song.artist,
-                              style: TextStyle(
-                                color: isCurrent ? AppConstants.accentColor : AppConstants.textSecondary,
-                                fontSize: 12,
-                              ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            isCurrent ? '▶ Now Playing' : song.artist,
+                            style: TextStyle(
+                              color: isCurrent ? AppConstants.accentColor : AppConstants.textSecondary,
+                              fontSize: 12,
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (isCurrent)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppConstants.accentColor.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      'NOW',
-                                      style: TextStyle(
-                                        color: AppConstants.accentColor,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isCurrent)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.accentColor.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    'NOW',
+                                    style: TextStyle(
+                                      color: AppConstants.accentColor,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                IconButton(
-                                  icon: Icon(
-                                    isFavorite ? Icons.favorite : Icons.favorite_border,
-                                    color: isFavorite ? Colors.red : Colors.white54,
-                                    size: 18,
-                                  ),
-                                  onPressed: () {
-                                    _audioManager.toggleFavorite(song);
-                                    setModalState(() {});
-                                  },
                                 ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.close,
-                                    color: Colors.white54,
-                                    size: 18,
-                                  ),
-                                  onPressed: () {
-                                    _audioManager.removeFromQueue(song);
-                                    setModalState(() {});
-                                  },
+                              IconButton(
+                                icon: Icon(
+                                  isFavorite ? Icons.favorite : Icons.favorite_border,
+                                  color: isFavorite ? Colors.red : Colors.white54,
+                                  size: 18,
                                 ),
-                              ],
-                            ),
-                            onTap: () {
-                              _audioManager.playSong(song);
-                              Navigator.pop(context);
-                            },
+                                onPressed: () {
+                                  _audioManager.toggleFavorite(song);
+                                  setModalState(() {});
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.close,
+                                  color: Colors.white54,
+                                  size: 18,
+                                ),
+                                onPressed: () {
+                                  _audioManager.removeFromQueue(song);
+                                  setModalState(() {});
+                                },
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  
-                  // Bottom Actions
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () {
-                          _audioManager.clearQueue();
-                          setModalState(() {});
-                          Navigator.pop(context);
-                        },
-                        icon: const Icon(Icons.clear_all, color: Colors.red, size: 18),
-                        label: const Text(
-                          'Clear Queue',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                      Container(
-                        height: 35,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: AppConstants.primaryGradient,
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            final shuffled = List.from(queue)..shuffle();
-                            _audioManager.clearQueue();
-                            _audioManager.addSongsToQueue(shuffled);
-                            setModalState(() {});
+                          onTap: () {
+                            _audioManager.playSong(song);
+                            Navigator.pop(context);
                           },
-                          icon: const Icon(Icons.shuffle, color: Colors.white, size: 16),
-                          label: const Text(
-                            'Shuffle',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            shadowColor: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                
+                // Bottom Actions
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        _audioManager.clearQueue();
+                        setModalState(() {});
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.clear_all, color: Colors.red, size: 18),
+                      label: const Text(
+                        'Clear Queue',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                    Container(
+                      height: 35,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: AppConstants.primaryGradient,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          // ✅ FIXED: Use List<Song>.from instead of List.from
+                          final shuffled = List<Song>.from(queue)..shuffle();
+                          _audioManager.clearQueue();
+                          _audioManager.addSongsToQueue(shuffled);
+                          setModalState(() {});
+                        },
+                        icon: const Icon(Icons.shuffle, color: Colors.white, size: 16),
+                        label: const Text(
+                          'Shuffle',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
   // ============================================================
   // EQ DIALOG
