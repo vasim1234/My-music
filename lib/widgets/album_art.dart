@@ -1,5 +1,6 @@
-import 'dart:io';
-import 'dart:math' as math;
+// ============================================================
+// ALBUM ART - WITH 3D MODE
+// ============================================================
 import 'package:flutter/material.dart';
 
 class AlbumArt extends StatelessWidget {
@@ -26,154 +27,131 @@ class AlbumArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: AnimatedBuilder(
-        animation: animation,
-        builder: (context, child) {
-          double animValue = animation.value;
-          double pulseScale = 1.0;
-          double beatGlow = 0.0;
-          
-          if (isPlaying) {
-            double rawFactor = math.sin((animValue - 1.0) * math.pi * 10);
-            pulseScale = 1.0 + (rawFactor.abs() * 0.06);
-            beatGlow = rawFactor.abs();
-          }
+    final size = MediaQuery.of(context).size.width * 0.6;
+    final firstLetter = songName.isNotEmpty ? songName.substring(0, 1).toUpperCase() : '♪';
 
-          final hasImage = _hasValidImage();
-
-          return Transform.scale(
-            scale: pulseScale,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // 1. Outer Bass Pulse Aura
-                Container(
-                  height: 245,
-                  width: 245,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: accentColor.withOpacity(
-                          isPlaying ? 0.25 + (beatGlow * 0.25) : 0.08,
-                        ),
-                        blurRadius: isPlaying ? 35 + (beatGlow * 25) : 15,
-                        spreadRadius: isPlaying ? 5 + (beatGlow * 12) : 2,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 2. Inner Glowing Border
-                Container(
-                  height: 215,
-                  width: 215,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (gradient.isNotEmpty ? gradient.first : accentColor)
-                            .withOpacity(isPlaying ? 0.4 + (beatGlow * 0.3) : 0.2),
-                        blurRadius: isPlaying ? 18 + (beatGlow * 10) : 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 3. Main Album Art Circle (Image or Fallback)
-                Container(
-                  height: 200,
-                  width: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF1E1E2C),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(isPlaying ? 0.25 : 0.1),
-                      width: 2,
-                    ),
-                    image: hasImage
-                        ? DecorationImage(
-                            image: FileImage(File(songPath!)),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child: !hasImage ? _buildDefaultFallback() : null,
-                ),
-
-                // 4. Sleep Timer Badge
-                if (isSleepTimerActive)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF9F43),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 6,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.timer_rounded, color: Colors.white, size: 14),
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withOpacity(0.3),
+            blurRadius: 30,
+            spreadRadius: 5,
+          ),
+        ],
       ),
-    );
-  }
-
-  bool _hasValidImage() {
-    if (songPath == null || songPath!.isEmpty) return false;
-    try {
-      final file = File(songPath!);
-      // Checking if file ends with image extensions, otherwise audio file path directly won't render as image
-      final pathLower = songPath!.toLowerCase();
-      if (file.existsSync() && (pathLower.endsWith('.jpg') || pathLower.endsWith('.png') || pathLower.endsWith('.jpeg'))) {
-        return true;
-      }
-    } catch (_) {}
-    return false;
-  }
-
-  Widget _buildDefaultFallback() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Stack(
         children: [
-          Icon(
-            Icons.music_note_rounded,
-            size: 65,
-            color: accentColor,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            songName.isNotEmpty ? songName.substring(0, 1).toUpperCase() : "M",
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.9),
-              shadows: [
-                Shadow(
-                  color: accentColor.withOpacity(0.6),
-                  blurRadius: 12,
-                ),
-              ],
+          // Main text
+          Center(
+            child: Text(
+              firstLetter,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 80,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
+          
+          // Playing indicator (animated pulse)
+          if (isPlaying)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: AnimatedBuilder(
+                animation: animation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: animation.value,
+                    child: child,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+            ),
+          
+          // Sleep timer indicator
+          if (isSleepTimerActive)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.timer, color: Colors.white, size: 14),
+                    SizedBox(width: 4),
+                    Text(
+                      'Zzz',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          
+          // ✅ 3D Mode indicator
+          if (is3DMode)
+            Positioned(
+              top: 16,
+              left: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Colors.purple, Colors.deepPurple],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.purple.withOpacity(0.5),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.three_mp, color: Colors.white, size: 14),
+                    SizedBox(width: 4),
+                    Text(
+                      '3D',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
