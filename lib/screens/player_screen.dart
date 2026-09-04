@@ -322,57 +322,59 @@ class AudioManagerExtended extends ChangeNotifier {
   // PLAY CURRENT
   // ============================================================
   Future<void> _playCurrent() async {
-    if (_queue.isEmpty) {
-      print('⚠️ Queue is empty');
-      _updatePlaybackState(PlaybackStatus.stopped);
-      return;
-    }
-    
-    if (_currentIndex >= _queue.length) {
+  if (_queue.isEmpty) {
+    print('⚠️ Queue is empty');
+    _updatePlaybackState(PlaybackStatus.stopped);
+    return;
+  }
+  
+  if (_currentIndex >= _queue.length) {
+    _currentIndex = 0;
+  }
+  
+  final song = _queue[_currentIndex];
+  print('🎵 _playCurrent called for: ${song.displayName}');
+  
+  if (!song.exists) {
+    print('❌ Song file does not exist: ${song.path}');
+    _queue.remove(song);
+    if (_queue.isNotEmpty) {
       _currentIndex = 0;
-    }
-    
-    final song = _queue[_currentIndex];
-    print('🎵 _playCurrent called for: ${song.displayName}');
-    
-    if (!song.exists) {
-      print('❌ Song file does not exist: ${song.path}');
-      _queue.remove(song);
-      if (_queue.isNotEmpty) {
-        _currentIndex = 0;
-        await _playCurrent();
-      } else {
-        _updatePlaybackState(PlaybackStatus.stopped);
-      }
-      _saveData();
-      return;
-    }
-
-    try {
-      _currentSong = song;
-      print('📁 Loading audio file: ${song.path}');
-      
-      await _audioManager.playSong(song.path, song.displayName, song.artist);
-      _isAudioPrepared = true;
-      _updatePlaybackState(PlaybackStatus.playing);
-      print('✅ Audio loaded and playing');
-      
-      _recent.remove(song);
-      _recent.insert(0, song);
-      if (_recent.length > AppConstants.maxRecentSongs) _recent.removeLast();
-      
-      _queue[_currentIndex] = song.copyWith(lastPlayed: DateTime.now());
-      
-      _isCompleting = false;
-      notifyListeners();
-      _saveData();
-    } catch (e) {
-      print('❌ Error playing song: $e');
+      await _playCurrent();
+    } else {
       _updatePlaybackState(PlaybackStatus.stopped);
-      _currentSong = null;
-      _isAudioPrepared = false;
-      notifyListeners();
     }
+    _saveData();
+    return;
+  }
+
+  try {
+    _currentSong = song;
+    print('📁 Loading audio file: ${song.path}');
+    
+    await _audioManager.playSong(song.path, song.displayName, song.artist);
+    _isAudioPrepared = true;
+    
+    // ✅ FIX: Always update state and notify
+    _status = PlaybackStatus.playing;
+    notifyListeners();
+    _saveData();
+    print('✅ Audio loaded and playing, UI updated');
+    
+    _recent.remove(song);
+    _recent.insert(0, song);
+    if (_recent.length > AppConstants.maxRecentSongs) _recent.removeLast();
+    
+    _queue[_currentIndex] = song.copyWith(lastPlayed: DateTime.now());
+    
+    _isCompleting = false;
+  } catch (e) {
+    print('❌ Error playing song: $e');
+    _status = PlaybackStatus.stopped;
+    _currentSong = null;
+    _isAudioPrepared = false;
+    notifyListeners();
+  }
   }
 
   Future<void> _playNext() async {
