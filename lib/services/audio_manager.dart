@@ -27,9 +27,13 @@ class AudioManager {
     });
   }
 
-  Future<void> toggle3DMode() async {
-    _is3DMode = !_is3DMode;
-    print('🎵 3D Mode: ${_is3DMode ? "ON" : "OFF"}');
+  // ============================================================
+// 3D MODE TOGGLE
+// ============================================================
+
+Future<void> toggle3DMode() async {
+  await _audioManager.toggle3DMode();
+}
     
     if (_is3DMode) {
       await _player.setVolume(1.3);
