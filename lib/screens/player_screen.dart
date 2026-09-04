@@ -180,7 +180,7 @@ class AudioManagerExtended extends ChangeNotifier {
   Map<String, List<Song>> _playlists = {};
   
   StreamSubscription<Duration>? _positionSubscription;
-  StreamSubscription<Duration>? _durationSubscription;
+  StreamSubscription<Duration?>? _durationSubscription;
   // Removed completionStream as it doesn't exist in AudioManager
   
   PlaybackStatus get status => _status;
