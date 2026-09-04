@@ -157,7 +157,7 @@ class Song {
 }
 
 // ============================================================
-// AUDIO MANAGER EXTENDED - COMPLETE
+// AUDIO MANAGER EXTENDED - COMPLETE FIXED VERSION
 // ============================================================
 enum PlaybackStatus { stopped, playing, paused }
 
@@ -178,8 +178,9 @@ class AudioManagerExtended extends ChangeNotifier {
   List<Song> _favorites = [];
   Map<String, List<Song>> _playlists = {};
   
-  Stream<Duration?>? get positionStream => _player.positionStream;
-  Stream<Duration?>? get urationStream => _player.durationStream;
+  // ✅ FIXED: Added these missing fields
+  StreamSubscription<Duration?>? _positionSubscription;
+  StreamSubscription<Duration?>? _durationSubscription;
   
   bool _isCompleting = false;
   
@@ -411,7 +412,10 @@ class AudioManagerExtended extends ChangeNotifier {
     }
   }
 
-  // ✅ PUBLIC METHODS
+  // ============================================================
+  // PUBLIC METHODS
+  // ============================================================
+  
   Future<void> playSong(Song song, {List<Song>? queue}) async {
     if (queue != null && queue.isNotEmpty) {
       _queue = List.from(queue);
