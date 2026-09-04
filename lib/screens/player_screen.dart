@@ -157,7 +157,7 @@ class Song {
 }
 
 // ============================================================
-// AUDIO MANAGER EXTENDED - COMPLETE VERSION
+// AUDIO MANAGER EXTENDED - COMPLETE
 // ============================================================
 enum PlaybackStatus { stopped, playing, paused }
 
@@ -314,10 +314,7 @@ class AudioManagerExtended extends ChangeNotifier {
     await _playCurrent();
   }
 
-  // ============================================================
-  // QUEUE PERSISTENCE
-  // ============================================================
-  
+  // Queue Persistence
   Future<void> _saveQueue() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -414,286 +411,7 @@ class AudioManagerExtended extends ChangeNotifier {
     }
   }
 
-  // ============================================================
-  // ✅ PUBLIC METHODS - ALL METHODS ADDED HERE
-  // ============================================================
-  
-  // ✅ playSong - Play a specific song
-  Future<void> playSong(Song song, {List<Song>? queue}) async {
-    if (queue != null && queue.isNotEmpty) {
-      _queue = List.from(queue);
-      _currentIndex = _queue.indexOf(song);
-      if (_currentIndex == -1) {
-        _queue.add(song);
-        _currentIndex = _queue.length - 1;
-      }
-    } else {
-      int index = _queue.indexOf(song);
-      if (index != -1) {
-        _currentIndex = index;
-      } else {
-        _queue.add(song);
-        _currentIndex = _queue.length - 1;
-      }
-    }
-    await _playCurrent();
-    _saveData();
-  }
-
-  // ✅ playNext - Play next song
-  Future<void> playNext() async => _playNext();
-
-  // ✅ playPrevious - Play previous song
-  Future<void> playPrevious() async {
-    if (_queue.isEmpty) return;
-    
-    await _audioManager.stop();
-    await Future.delayed(const Duration(milliseconds: 200));
-    
-    _currentIndex = (_currentIndex - 1 + _queue.length) % _queue.length;
-    await _playCurrent();
-    _saveData();
-  }
-
-  // ✅ togglePlayPause - Toggle between play and pause
-  Future<void> togglePlayPause() async {
-    if (_queue.isEmpty) return;
-    
-    if (_status == PlaybackStatus.playing) {
-      await _audioManager.pause();
-      _status = PlaybackStatus.paused;
-      notifyListeners();
-    } else {
-      if (_currentSong == null) {
-        await _playCurrent();
-      } else {
-        await _audioManager.play();
-        _status = PlaybackStatus.playing;
-        notifyListeners();
-      }
-    }
-    _saveData();
-  }
-
-  // ✅ toggleShuffle - Toggle shuffle mode
-  void toggleShuffle() {
-    _isShuffle = !_isShuffle;
-    if (_isShuffle) _repeatMode = 0;
-    _saveData();
-    notifyListeners();
-  }
-
-  // ✅ toggleFavorite - Toggle favorite status
-  void toggleFavorite(Song song) {
-    final index = _favorites.indexOf(song);
-    if (index != -1) {
-      _favorites.removeAt(index);
-    } else {
-      _favorites.add(song);
-    }
-    final queueIndex = _queue.indexOf(song);
-    if (queueIndex != -1) {
-      _queue[queueIndex] = song.copyWith(isFavorite: !song.isFavorite);
-    }
-    _saveData();
-    notifyListeners();
-  }
-
-  // ✅ setRepeatMode - Set repeat mode (0: off, 1: one, 2: all)
-  void setRepeatMode(int mode) {
-    _repeatMode = mode;
-    if (_repeatMode != 0) _isShuffle = false;
-    _saveData();
-    notifyListeners();
-  }
-
-  // ✅ seek - Seek to position
-  Future<void> seek(Duration position) async {
-    await _audioManager.seek(position);
-    _position = position;
-    notifyListeners();
-  }
-
-  // ✅ setVolume - Set volume
-  Future<void> setVolume(double volume) async {
-    _volume = volume.clamp(0.0, 1.0);
-    await _audioManager.setVolume(_volume);
-    _saveData();
-    notifyListeners();
-  }
-
-  // ✅ addToPlaylist - Add song to playlist
-  void addToPlaylist(String name, Song song) {
-    if (!_playlists.containsKey(name)) {
-      _playlists[name] = [];
-    }
-    if (!_playlists[name]!.contains(song)) {
-      _playlists[name]!.add(song);
-      _saveData();
-      notifyListeners();
-    }
-  }
-
-  // ✅ removeFromPlaylist - Remove song from playlist
-  void removeFromPlaylist(String name, Song song) {
-    if (_playlists.containsKey(name)) {
-      _playlists[name]!.remove(song);
-      if (_playlists[name]!.isEmpty) {
-        _playlists.remove(name);
-      }
-      _saveData();
-      notifyListeners();
-    }
-  }
-
-  // ✅ createPlaylist - Create new playlist
-  void createPlaylist(String name) {
-    if (name.trim().isNotEmpty && !_playlists.containsKey(name)) {
-      _playlists[name.trim()] = [];
-      _saveData();
-      notifyListeners();
-    }
-  }
-
-  // ✅ deletePlaylist - Delete playlist
-  void deletePlaylist(String name) {
-    _playlists.remove(name);
-    _saveData();
-    notifyListeners();
-  }
-
-  // ✅ clearQueue - Clear all songs from queue
-  void clearQueue() {
-    _queue.clear();
-    _currentSong = null;
-    _currentIndex = 0;
-    _status = PlaybackStatus.stopped;
-    _position = Duration.zero;
-    _duration = Duration.zero;
-    _saveData();
-    notifyListeners();
-  }
-
-  // ✅ addSongsToQueue - Add multiple songs to queue
-  void addSongsToQueue(List<Song> songs) {
-    _queue.addAll(songs);
-    _saveData();
-    notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    _positionSubscription?.cancel();
-    _durationSubscription?.cancel();
-    _audioManager.dispose();
-    super.dispose();
-  }
-}
-
-  // ============================================================
-  // QUEUE PERSISTENCE - FIX FOR SONGS DISAPPEARING
-  // ============================================================
-  
-  Future<void> _saveQueue() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      List<String> queuePaths = _queue.map((s) => s.path).toList();
-      await prefs.setStringList('queue', queuePaths);
-      await prefs.setInt('currentIndex', _currentIndex);
-    } catch (e) {
-      print('❌ Error saving queue: $e');
-    }
-  }
-
-  Future<void> _loadQueue() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      List<String>? queuePaths = prefs.getStringList('queue');
-      if (queuePaths != null && queuePaths.isNotEmpty) {
-        _queue = queuePaths
-            .where((path) => File(path).existsSync())
-            .map((path) => Song(path: path, name: path.split('/').last))
-            .toList();
-        
-        _currentIndex = prefs.getInt('currentIndex') ?? 0;
-        if (_currentIndex >= _queue.length) {
-          _currentIndex = _queue.isNotEmpty ? _queue.length - 1 : 0;
-        }
-        
-        if (_queue.isNotEmpty && _currentIndex < _queue.length) {
-          _currentSong = _queue[_currentIndex];
-        }
-      }
-    } catch (e) {
-      print('❌ Error loading queue: $e');
-    }
-  }
-
-  Future<void> _loadSavedData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      await _loadQueue();
-      
-      List<String>? recentPaths = prefs.getStringList('recent');
-      if (recentPaths != null && recentPaths.isNotEmpty) {
-        _recent = recentPaths
-            .where((path) => File(path).existsSync())
-            .map((path) => Song(path: path, name: path.split('/').last))
-            .toList();
-      }
-      
-      _isShuffle = prefs.getBool('isShuffle') ?? false;
-      _repeatMode = prefs.getInt('repeatMode') ?? 0;
-      _volume = prefs.getDouble('volume') ?? 1.0;
-      
-      String? playlistsJson = prefs.getString('playlists');
-      if (playlistsJson != null) {
-        Map<String, dynamic> decoded = jsonDecode(playlistsJson);
-        decoded.forEach((key, value) {
-          List<String> paths = List<String>.from(value);
-          _playlists[key] = paths
-              .where((path) => File(path).existsSync())
-              .map((path) => Song(path: path, name: path.split('/').last))
-              .toList();
-        });
-      }
-      
-      notifyListeners();
-    } catch (e) {
-      print('❌ Error loading data: $e');
-    }
-  }
-
-  Future<void> _saveData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      await _saveQueue();
-      
-      List<String> recentPaths = _recent.map((s) => s.path).toList();
-      await prefs.setStringList('recent', recentPaths);
-      
-      await prefs.setBool('isShuffle', _isShuffle);
-      await prefs.setInt('repeatMode', _repeatMode);
-      await prefs.setDouble('volume', _volume);
-      
-      Map<String, List<String>> playlistMap = {};
-      _playlists.forEach((key, value) {
-        playlistMap[key] = value.map((s) => s.path).toList();
-      });
-      await prefs.setString('playlists', jsonEncode(playlistMap));
-      
-    } catch (e) {
-      print('❌ Error saving data: $e');
-    }
-  }
-
-  // ============================================================
-  // PUBLIC METHODS
-  // ===========================================================
-  
+  // ✅ PUBLIC METHODS
   Future<void> playSong(Song song, {List<Song>? queue}) async {
     if (queue != null && queue.isNotEmpty) {
       _queue = List.from(queue);
@@ -747,29 +465,9 @@ class AudioManagerExtended extends ChangeNotifier {
     _saveData();
   }
 
-  Future<void> seek(Duration position) async {
-    await _audioManager.seek(position);
-    _position = position;
-    notifyListeners();
-  }
-
-  Future<void> setVolume(double volume) async {
-    _volume = volume.clamp(0.0, 1.0);
-    await _audioManager.setVolume(_volume);
-    _saveData();
-    notifyListeners();
-  }
-
   void toggleShuffle() {
     _isShuffle = !_isShuffle;
     if (_isShuffle) _repeatMode = 0;
-    _saveData();
-    notifyListeners();
-  }
-
-  void setRepeatMode(int mode) {
-    _repeatMode = mode;
-    if (_repeatMode != 0) _isShuffle = false;
     _saveData();
     notifyListeners();
   }
@@ -785,6 +483,26 @@ class AudioManagerExtended extends ChangeNotifier {
     if (queueIndex != -1) {
       _queue[queueIndex] = song.copyWith(isFavorite: !song.isFavorite);
     }
+    _saveData();
+    notifyListeners();
+  }
+
+  void setRepeatMode(int mode) {
+    _repeatMode = mode;
+    if (_repeatMode != 0) _isShuffle = false;
+    _saveData();
+    notifyListeners();
+  }
+
+  Future<void> seek(Duration position) async {
+    await _audioManager.seek(position);
+    _position = position;
+    notifyListeners();
+  }
+
+  Future<void> setVolume(double volume) async {
+    _volume = volume.clamp(0.0, 1.0);
+    await _audioManager.setVolume(_volume);
     _saveData();
     notifyListeners();
   }
@@ -862,6 +580,7 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
+  // ✅ AudioManagerExtended instance
   late AudioManagerExtended _audioManager;
   
   int _selectedTab = 0;
@@ -1033,7 +752,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-  // EQ DIALOG - Simplified
+  // EQ DIALOG
   // ============================================================
   void _showEqualizerDialog() {
     showModalBottomSheet(
@@ -1052,154 +771,197 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(colors: AppConstants.primaryGradient),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.equalizer, color: Colors.white, size: 22),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text('Equalizer', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                          if (_isEqActive)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text('ON', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
-                            ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white70),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
+                  _buildEQHeader(setModalState),
                   const Divider(color: Colors.white24),
-                  const Text('PRESETS', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: AppConstants.eqPresets.keys.map((preset) {
-                      bool isSelected = _currentEqPreset == preset;
-                      return FilterChip(
-                        label: Text(preset, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 11)),
-                        selected: isSelected,
-                        selectedColor: AppConstants.accentColor.withOpacity(0.3),
-                        backgroundColor: AppConstants.cardColor,
-                        side: BorderSide(color: isSelected ? AppConstants.accentColor : Colors.grey.shade700, width: 1.5),
-                        onSelected: (selected) async {
-                          if (selected) {
-                            setState(() {
-                              _currentEqPreset = preset;
-                              _currentEqValues = List.from(AppConstants.eqPresets[preset]!);
-                              _isEqActive = preset != 'Normal';
-                            });
-                            setModalState(() {});
-                            await _applyEqualizer();
-                            _saveEQState();
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
+                  _buildEQPresets(setModalState),
                   const SizedBox(height: 16),
                   const Divider(color: Colors.white24),
-                  const Text('3 BAND EQUALIZER', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+                  _buildEQSliders(setModalState),
                   const SizedBox(height: 8),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: 3,
-                      itemBuilder: (context, index) {
-                        final colors = [Colors.red, Colors.green, Colors.blue];
-                        final color = colors[index % colors.length];
-                        
-                        return Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  AppConstants.bandLabels[index],
-                                  style: const TextStyle(color: Colors.white70, fontSize: 13),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(colors: [color, color.withOpacity(0.6)]),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    _currentEqValues[index] > 0 
-                                        ? '+${_currentEqValues[index].toInt()}' 
-                                        : '${_currentEqValues[index].toInt()}',
-                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Slider(
-                              value: _currentEqValues[index],
-                              min: -10,
-                              max: 10,
-                              activeColor: color,
-                              inactiveColor: Colors.grey.shade800,
-                              onChanged: (value) async {
-                                setState(() {
-                                  _currentEqValues[index] = value;
-                                  _currentEqPreset = 'Custom';
-                                  _isEqActive = true;
-                                });
-                                setModalState(() {});
-                                await _applyEqualizer();
-                                _saveEQState();
-                              },
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Enable Equalizer', style: TextStyle(color: Colors.white, fontSize: 14)),
-                      Switch(
-                        value: _isEqActive,
-                        activeColor: AppConstants.accentColor,
-                        activeTrackColor: AppConstants.accentColor.withOpacity(0.3),
-                        onChanged: (value) async {
-                          setState(() {
-                            _isEqActive = value;
-                            if (!value) {
-                              _currentEqValues = [0, 0, 0];
-                              _currentEqPreset = 'Normal';
-                            }
-                          });
-                          setModalState(() {});
-                          await _applyEqualizer();
-                          _saveEQState();
-                        },
-                      ),
-                    ],
-                  ),
+                  _buildEQToggle(setModalState),
                 ],
               ),
             );
           },
         );
       },
+    );
+  }
+
+  Widget _buildEQHeader(StateSetter setModalState) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: AppConstants.primaryGradient),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.equalizer, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Text('Equalizer', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            if (_isEqActive)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text('ON', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+              onPressed: () async {
+                setState(() {
+                  _currentEqPreset = 'Normal';
+                  _currentEqValues = [0, 0, 0];
+                  _isEqActive = false;
+                });
+                setModalState(() {});
+                await _applyEqualizer();
+                _saveEQState();
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white70),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEQPresets(StateSetter setModalState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('PRESETS', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: AppConstants.eqPresets.keys.map((preset) {
+            bool isSelected = _currentEqPreset == preset;
+            return FilterChip(
+              label: Text(preset, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 11)),
+              selected: isSelected,
+              selectedColor: AppConstants.accentColor.withOpacity(0.3),
+              backgroundColor: AppConstants.cardColor,
+              side: BorderSide(color: isSelected ? AppConstants.accentColor : Colors.grey.shade700, width: 1.5),
+              onSelected: (selected) async {
+                if (selected) {
+                  setState(() {
+                    _currentEqPreset = preset;
+                    _currentEqValues = List.from(AppConstants.eqPresets[preset]!);
+                    _isEqActive = preset != 'Normal';
+                  });
+                  setModalState(() {});
+                  await _applyEqualizer();
+                  _saveEQState();
+                }
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEQSliders(StateSetter setModalState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('3 BAND EQUALIZER', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Expanded(
+          child: ListView.builder(
+            itemCount: 3,
+            itemBuilder: (context, index) {
+              final colors = [Colors.red, Colors.green, Colors.blue];
+              final color = colors[index % colors.length];
+              
+              return Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        AppConstants.bandLabels[index],
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [color, color.withOpacity(0.6)]),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _currentEqValues[index] > 0 
+                              ? '+${_currentEqValues[index].toInt()}' 
+                              : '${_currentEqValues[index].toInt()}',
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: _currentEqValues[index],
+                    min: -10,
+                    max: 10,
+                    activeColor: color,
+                    inactiveColor: Colors.grey.shade800,
+                    onChanged: (value) async {
+                      setState(() {
+                        _currentEqValues[index] = value;
+                        _currentEqPreset = 'Custom';
+                        _isEqActive = true;
+                      });
+                      setModalState(() {});
+                      await _applyEqualizer();
+                      _saveEQState();
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEQToggle(StateSetter setModalState) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text('Enable Equalizer', style: TextStyle(color: Colors.white, fontSize: 14)),
+        Switch(
+          value: _isEqActive,
+          activeColor: AppConstants.accentColor,
+          activeTrackColor: AppConstants.accentColor.withOpacity(0.3),
+          onChanged: (value) async {
+            setState(() {
+              _isEqActive = value;
+              if (!value) {
+                _currentEqValues = [0, 0, 0];
+                _currentEqPreset = 'Normal';
+              }
+            });
+            setModalState(() {});
+            await _applyEqualizer();
+            _saveEQState();
+          },
+        ),
+      ],
     );
   }
 
@@ -2261,223 +2023,216 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   }
 
   // ============================================================
-// PLAYER UI - WITH 3D BUTTON
-// ============================================================
-Widget _buildPlayerUI() {
-  final queue = _audioManager.queue;
-  final currentSong = _audioManager.currentSong;
-  final isPlaying = _audioManager.isPlaying;
-  final currentIndex = _audioManager.currentIndex;
-  
-  String currentSongName = currentSong?.displayName ?? "No song playing";
-  bool hasSongs = queue.isNotEmpty;
-  List<Color> currentGradient = hasSongs 
-      ? AppHelpers.getSongGradient(currentIndex)
-      : AppConstants.primaryGradient;
+  // PLAYER UI
+  // ============================================================
+  Widget _buildPlayerUI() {
+    final queue = _audioManager.queue;
+    final currentSong = _audioManager.currentSong;
+    final isPlaying = _audioManager.isPlaying;
+    final currentIndex = _audioManager.currentIndex;
+    
+    String currentSongName = currentSong?.displayName ?? "No song playing";
+    bool hasSongs = queue.isNotEmpty;
+    List<Color> currentGradient = hasSongs 
+        ? AppHelpers.getSongGradient(currentIndex)
+        : AppConstants.primaryGradient;
 
-  return SafeArea(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          const SizedBox(height: 16),
-          Text(
-            currentSongName,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            currentSong?.artist ?? "Luna Echo",
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 20),
-          
-          // Album Art
-          AlbumArt(
-            isPlaying: isPlaying,
-            is3DMode: _is3DMode,  // Pass 3D mode
-            songName: currentSongName,
-            songPath: currentSong?.path,
-            gradient: currentGradient,
-            isSleepTimerActive: _sleepTimerActive,
-            animation: _pulseAnimation,
-            accentColor: AppConstants.accentColor,
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // Progress Bar
-          Column(
-            children: [
-              SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 3,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                  activeTrackColor: AppConstants.accentColor,
-                  inactiveTrackColor: Colors.grey.shade800,
-                  thumbColor: AppConstants.accentColor,
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Text(
+              currentSongName,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              currentSong?.artist ?? "Luna Echo",
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 20),
+            
+            AlbumArt(
+              isPlaying: isPlaying,
+              is3DMode: _is3DMode,
+              songName: currentSongName,
+              songPath: currentSong?.path,
+              gradient: currentGradient,
+              isSleepTimerActive: _sleepTimerActive,
+              animation: _pulseAnimation,
+              accentColor: AppConstants.accentColor,
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Progress Bar
+            Column(
+              children: [
+                SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                    activeTrackColor: AppConstants.accentColor,
+                    inactiveTrackColor: Colors.grey.shade800,
+                    thumbColor: AppConstants.accentColor,
+                  ),
+                  child: Slider(
+                    min: 0.0,
+                    max: _audioManager.duration.inSeconds.toDouble() > 0 
+                        ? _audioManager.duration.inSeconds.toDouble() 
+                        : 1.0,
+                    value: _audioManager.position.inSeconds.toDouble().clamp(
+                        0.0, 
+                        _audioManager.duration.inSeconds.toDouble() > 0 
+                            ? _audioManager.duration.inSeconds.toDouble() 
+                            : 1.0
+                    ),
+                    onChanged: (value) async {
+                      final position = Duration(seconds: value.toInt());
+                      await _audioManager.seek(position);
+                    },
+                  ),
                 ),
-                child: Slider(
-                  min: 0.0,
-                  max: _audioManager.duration.inSeconds.toDouble() > 0 
-                      ? _audioManager.duration.inSeconds.toDouble() 
-                      : 1.0,
-                  value: _audioManager.position.inSeconds.toDouble().clamp(
-                      0.0, 
-                      _audioManager.duration.inSeconds.toDouble() > 0 
-                          ? _audioManager.duration.inSeconds.toDouble() 
-                          : 1.0
-                  ),
-                  onChanged: (value) async {
-                    final position = Duration(seconds: value.toInt());
-                    await _audioManager.seek(position);
-                  },
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    AppHelpers.formatDuration(_audioManager.position),
-                    style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
-                  ),
-                  Text(
-                    AppHelpers.formatDuration(_audioManager.duration),
-                    style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 14),
-          
-          // Playback Controls
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.skip_previous, color: Colors.white, size: 24),
-                onPressed: hasSongs ? () => _audioManager.playPrevious() : null,
-              ),
-              const SizedBox(width: 4),
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(colors: currentGradient),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppConstants.accentColor.withOpacity(0.35),
-                      blurRadius: 15,
-                      spreadRadius: 3,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      AppHelpers.formatDuration(_audioManager.position),
+                      style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
+                    ),
+                    Text(
+                      AppHelpers.formatDuration(_audioManager.duration),
+                      style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
                     ),
                   ],
                 ),
-                child: IconButton(
-                  icon: Icon(
-                    isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.white,
-                  ),
-                  iconSize: 30,
-                  onPressed: () => _audioManager.togglePlayPause(),
-                  padding: const EdgeInsets.all(12),
+              ],
+            ),
+            
+            const SizedBox(height: 14),
+            
+            // Playback Controls
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 24),
+                  onPressed: hasSongs ? () => _audioManager.playPrevious() : null,
                 ),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Icons.skip_next, color: Colors.white, size: 24),
-                onPressed: hasSongs ? () => _audioManager.playNext() : null,
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 14),
-          
-          // Additional Controls - WITH 3D BUTTON
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // ✅ 3D Button Added Here
-              _buildActionButton(
-                icon: Icons.three_mp,
-                label: '3D',
-                isActive: _is3DMode,
-                activeColor: Colors.purple,
-                size: 18,
-                onTap: () {
-                  setState(() {
-                    _is3DMode = !_is3DMode;
-                  });
-                },
-              ),
-              
-              _buildActionButton(
-                icon: Icons.volume_up,
-                label: 'Volume',
-                isActive: false,
-                activeColor: AppConstants.accentColor,
-                size: 18,
-                onTap: _showVolumePopup,
-              ),
-              
-              _buildActionButton(
-                icon: Icons.shuffle,
-                label: 'Shuffle',
-                isActive: _audioManager.isShuffle,
-                activeColor: AppConstants.accentColor,
-                size: 18,
-                onTap: () => _audioManager.toggleShuffle(),
-              ),
-              
-              _buildActionButton(
-                icon: _audioManager.repeatMode == 0 ? Icons.repeat_outlined :
-                       _audioManager.repeatMode == 1 ? Icons.repeat_one :
-                       Icons.repeat,
-                label: 'Repeat',
-                isActive: _audioManager.repeatMode != 0,
-                activeColor: AppConstants.accentColor,
-                size: 18,
-                onTap: _showShuffleRepeatMenu,
-              ),
-              
-              _buildActionButton(
-                icon: Icons.timer,
-                label: 'Timer',
-                isActive: _sleepTimerActive,
-                activeColor: AppConstants.warningColor,
-                size: 18,
-                onTap: _showSleepTimerDialog,
-              ),
-              
-              _buildActionButton(
-                icon: Icons.favorite,
-                label: 'Fav',
-                isActive: currentSong != null && _audioManager.favorites.contains(currentSong),
-                activeColor: Colors.red,
-                size: 18,
-                onTap: () {
-                  if (currentSong != null) {
-                    _audioManager.toggleFavorite(currentSong);
-                    setState(() {});
-                  }
-                },
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 8),
-        ],
+                const SizedBox(width: 4),
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: currentGradient),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppConstants.accentColor.withOpacity(0.35),
+                        blurRadius: 15,
+                        spreadRadius: 3,
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                    ),
+                    iconSize: 30,
+                    onPressed: () => _audioManager.togglePlayPause(),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 24),
+                  onPressed: hasSongs ? () => _audioManager.playNext() : null,
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 14),
+            
+            // Additional Controls
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildActionButton(
+                  icon: Icons.three_mp,
+                  label: '3D',
+                  isActive: _is3DMode,
+                  activeColor: Colors.purple,
+                  size: 18,
+                  onTap: () {
+                    setState(() {
+                      _is3DMode = !_is3DMode;
+                    });
+                  },
+                ),
+                _buildActionButton(
+                  icon: Icons.volume_up,
+                  label: 'Volume',
+                  isActive: false,
+                  activeColor: AppConstants.accentColor,
+                  size: 18,
+                  onTap: _showVolumePopup,
+                ),
+                _buildActionButton(
+                  icon: Icons.shuffle,
+                  label: 'Shuffle',
+                  isActive: _audioManager.isShuffle,
+                  activeColor: AppConstants.accentColor,
+                  size: 18,
+                  onTap: () => _audioManager.toggleShuffle(),
+                ),
+                _buildActionButton(
+                  icon: _audioManager.repeatMode == 0 ? Icons.repeat_outlined :
+                         _audioManager.repeatMode == 1 ? Icons.repeat_one :
+                         Icons.repeat,
+                  label: 'Repeat',
+                  isActive: _audioManager.repeatMode != 0,
+                  activeColor: AppConstants.accentColor,
+                  size: 18,
+                  onTap: _showShuffleRepeatMenu,
+                ),
+                _buildActionButton(
+                  icon: Icons.timer,
+                  label: 'Timer',
+                  isActive: _sleepTimerActive,
+                  activeColor: AppConstants.warningColor,
+                  size: 18,
+                  onTap: _showSleepTimerDialog,
+                ),
+                _buildActionButton(
+                  icon: Icons.favorite,
+                  label: 'Fav',
+                  isActive: currentSong != null && _audioManager.favorites.contains(currentSong),
+                  activeColor: Colors.red,
+                  size: 18,
+                  onTap: () {
+                    if (currentSong != null) {
+                      _audioManager.toggleFavorite(currentSong);
+                      setState(() {});
+                    }
+                  },
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildActionButton({
     required IconData icon,
@@ -2497,9 +2252,23 @@ Widget _buildPlayerUI() {
             decoration: BoxDecoration(
               color: isActive ? activeColor.withOpacity(0.15) : AppConstants.cardColor,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isActive ? activeColor : Colors.grey.shade800, width: 1),
+              border: Border.all(
+                color: isActive ? activeColor : Colors.grey.shade800,
+                width: isActive ? 2 : 1,
+              ),
+              boxShadow: isActive ? [
+                BoxShadow(
+                  color: activeColor.withOpacity(0.3),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ] : null,
             ),
-            child: Icon(icon, color: isActive ? activeColor : Colors.white54, size: size),
+            child: Icon(
+              icon,
+              color: isActive ? activeColor : Colors.white54,
+              size: size,
+            ),
           ),
           const SizedBox(height: 3),
           Text(
@@ -2507,7 +2276,7 @@ Widget _buildPlayerUI() {
             style: TextStyle(
               color: isActive ? activeColor : AppConstants.textSecondary,
               fontSize: 9,
-              fontWeight: FontWeight.w500,
+              fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
             ),
           ),
         ],
