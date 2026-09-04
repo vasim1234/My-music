@@ -157,8 +157,8 @@ class Song {
 }
 
 // ============================================================
-// AUDIO MANAGER EXTENDED - FIXED VERSION
-// ============================================================ 
+// AUDIO MANAGER EXTENDED - COMPLETE VERSION
+// ============================================================
 enum PlaybackStatus { stopped, playing, paused }
 
 class AudioManagerExtended extends ChangeNotifier {
@@ -183,6 +183,7 @@ class AudioManagerExtended extends ChangeNotifier {
   
   bool _isCompleting = false;
   
+  // Getters
   PlaybackStatus get status => _status;
   Song? get currentSong => _currentSong;
   Duration get position => _position;
@@ -313,7 +314,10 @@ class AudioManagerExtended extends ChangeNotifier {
     await _playCurrent();
   }
 
-  // ✅ Save queue to SharedPreferences
+  // ============================================================
+  // QUEUE PERSISTENCE
+  // ============================================================
+  
   Future<void> _saveQueue() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -325,7 +329,6 @@ class AudioManagerExtended extends ChangeNotifier {
     }
   }
 
-  // ✅ Load queue from SharedPreferences
   Future<void> _loadQueue() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -351,12 +354,10 @@ class AudioManagerExtended extends ChangeNotifier {
     }
   }
 
-  // ✅ Updated load method including queue
   Future<void> _loadSavedData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Load queue first
       await _loadQueue();
       
       List<String>? recentPaths = prefs.getStringList('recent');
@@ -389,12 +390,10 @@ class AudioManagerExtended extends ChangeNotifier {
     }
   }
 
-  // ✅ Updated save method including queue
   Future<void> _saveData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Save queue
       await _saveQueue();
       
       List<String> recentPaths = _recent.map((s) => s.path).toList();
@@ -413,6 +412,181 @@ class AudioManagerExtended extends ChangeNotifier {
     } catch (e) {
       print('❌ Error saving data: $e');
     }
+  }
+
+  // ============================================================
+  // ✅ PUBLIC METHODS - ALL METHODS ADDED HERE
+  // ============================================================
+  
+  // ✅ playSong - Play a specific song
+  Future<void> playSong(Song song, {List<Song>? queue}) async {
+    if (queue != null && queue.isNotEmpty) {
+      _queue = List.from(queue);
+      _currentIndex = _queue.indexOf(song);
+      if (_currentIndex == -1) {
+        _queue.add(song);
+        _currentIndex = _queue.length - 1;
+      }
+    } else {
+      int index = _queue.indexOf(song);
+      if (index != -1) {
+        _currentIndex = index;
+      } else {
+        _queue.add(song);
+        _currentIndex = _queue.length - 1;
+      }
+    }
+    await _playCurrent();
+    _saveData();
+  }
+
+  // ✅ playNext - Play next song
+  Future<void> playNext() async => _playNext();
+
+  // ✅ playPrevious - Play previous song
+  Future<void> playPrevious() async {
+    if (_queue.isEmpty) return;
+    
+    await _audioManager.stop();
+    await Future.delayed(const Duration(milliseconds: 200));
+    
+    _currentIndex = (_currentIndex - 1 + _queue.length) % _queue.length;
+    await _playCurrent();
+    _saveData();
+  }
+
+  // ✅ togglePlayPause - Toggle between play and pause
+  Future<void> togglePlayPause() async {
+    if (_queue.isEmpty) return;
+    
+    if (_status == PlaybackStatus.playing) {
+      await _audioManager.pause();
+      _status = PlaybackStatus.paused;
+      notifyListeners();
+    } else {
+      if (_currentSong == null) {
+        await _playCurrent();
+      } else {
+        await _audioManager.play();
+        _status = PlaybackStatus.playing;
+        notifyListeners();
+      }
+    }
+    _saveData();
+  }
+
+  // ✅ toggleShuffle - Toggle shuffle mode
+  void toggleShuffle() {
+    _isShuffle = !_isShuffle;
+    if (_isShuffle) _repeatMode = 0;
+    _saveData();
+    notifyListeners();
+  }
+
+  // ✅ toggleFavorite - Toggle favorite status
+  void toggleFavorite(Song song) {
+    final index = _favorites.indexOf(song);
+    if (index != -1) {
+      _favorites.removeAt(index);
+    } else {
+      _favorites.add(song);
+    }
+    final queueIndex = _queue.indexOf(song);
+    if (queueIndex != -1) {
+      _queue[queueIndex] = song.copyWith(isFavorite: !song.isFavorite);
+    }
+    _saveData();
+    notifyListeners();
+  }
+
+  // ✅ setRepeatMode - Set repeat mode (0: off, 1: one, 2: all)
+  void setRepeatMode(int mode) {
+    _repeatMode = mode;
+    if (_repeatMode != 0) _isShuffle = false;
+    _saveData();
+    notifyListeners();
+  }
+
+  // ✅ seek - Seek to position
+  Future<void> seek(Duration position) async {
+    await _audioManager.seek(position);
+    _position = position;
+    notifyListeners();
+  }
+
+  // ✅ setVolume - Set volume
+  Future<void> setVolume(double volume) async {
+    _volume = volume.clamp(0.0, 1.0);
+    await _audioManager.setVolume(_volume);
+    _saveData();
+    notifyListeners();
+  }
+
+  // ✅ addToPlaylist - Add song to playlist
+  void addToPlaylist(String name, Song song) {
+    if (!_playlists.containsKey(name)) {
+      _playlists[name] = [];
+    }
+    if (!_playlists[name]!.contains(song)) {
+      _playlists[name]!.add(song);
+      _saveData();
+      notifyListeners();
+    }
+  }
+
+  // ✅ removeFromPlaylist - Remove song from playlist
+  void removeFromPlaylist(String name, Song song) {
+    if (_playlists.containsKey(name)) {
+      _playlists[name]!.remove(song);
+      if (_playlists[name]!.isEmpty) {
+        _playlists.remove(name);
+      }
+      _saveData();
+      notifyListeners();
+    }
+  }
+
+  // ✅ createPlaylist - Create new playlist
+  void createPlaylist(String name) {
+    if (name.trim().isNotEmpty && !_playlists.containsKey(name)) {
+      _playlists[name.trim()] = [];
+      _saveData();
+      notifyListeners();
+    }
+  }
+
+  // ✅ deletePlaylist - Delete playlist
+  void deletePlaylist(String name) {
+    _playlists.remove(name);
+    _saveData();
+    notifyListeners();
+  }
+
+  // ✅ clearQueue - Clear all songs from queue
+  void clearQueue() {
+    _queue.clear();
+    _currentSong = null;
+    _currentIndex = 0;
+    _status = PlaybackStatus.stopped;
+    _position = Duration.zero;
+    _duration = Duration.zero;
+    _saveData();
+    notifyListeners();
+  }
+
+  // ✅ addSongsToQueue - Add multiple songs to queue
+  void addSongsToQueue(List<Song> songs) {
+    _queue.addAll(songs);
+    _saveData();
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _positionSubscription?.cancel();
+    _durationSubscription?.cancel();
+    _audioManager.dispose();
+    super.dispose();
   }
 }
 
@@ -518,7 +692,7 @@ class AudioManagerExtended extends ChangeNotifier {
 
   // ============================================================
   // PUBLIC METHODS
-  // ============================================================
+  // ===========================================================
   
   Future<void> playSong(Song song, {List<Song>? queue}) async {
     if (queue != null && queue.isNotEmpty) {
