@@ -157,7 +157,7 @@ class Song {
 }
 
 // ============================================================
-// AUDIO MANAGER EXTENDED - FIXED
+// AUDIO MANAGER EXTENDED - COMPLETE FIXED VERSION
 // ============================================================
 enum PlaybackStatus { stopped, playing, paused }
 
@@ -175,18 +175,11 @@ class AudioManagerExtended extends ChangeNotifier {
   bool _isShuffle = false;
   int _repeatMode = 0;
   
-  // ✅ QUEUE - Current playing songs (separate from playlists)
   List<Song> _queue = [];
   int _currentIndex = 0;
-  
-  // ✅ MASTER LIST - All songs from phone (PERMANENT)
   List<Song> _masterList = [];
-  
-  // ✅ RECENT & FAVORITES
   List<Song> _recent = [];
   List<Song> _favorites = [];
-  
-  // ✅ PLAYLISTS - Separate from queue (DOES NOT AFFECT QUEUE)
   Map<String, List<Song>> _playlists = {};
   
   StreamSubscription<Duration?>? _positionSubscription;
@@ -278,6 +271,21 @@ class AudioManagerExtended extends ChangeNotifier {
     }
   }
 
+  // ============================================================
+  // PLAYBACK METHODS - UPDATED WITH STATE SYNC
+  // ============================================================
+  
+  // ✅ ADD THIS METHOD
+  void _updatePlaybackState(PlaybackStatus newStatus) {
+    if (_status != newStatus) {
+      _status = newStatus;
+      notifyListeners();
+      _saveData();
+      print('🔄 Playback state updated: $_status');
+    }
+  }
+
+  // ✅ UPDATE THIS METHOD
   Future<void> _playCurrent() async {
     if (_queue.isEmpty || _currentIndex >= _queue.length) return;
     
@@ -295,7 +303,7 @@ class AudioManagerExtended extends ChangeNotifier {
     try {
       _currentSong = song;
       await _audioManager.playSong(song.path, song.displayName, song.artist);
-      _status = PlaybackStatus.playing;
+      _updatePlaybackState(PlaybackStatus.playing);
       
       _recent.remove(song);
       _recent.insert(0, song);
@@ -307,12 +315,13 @@ class AudioManagerExtended extends ChangeNotifier {
       notifyListeners();
       _saveData();
     } catch (e) {
-      _status = PlaybackStatus.stopped;
+      _updatePlaybackState(PlaybackStatus.stopped);
       notifyListeners();
       rethrow;
     }
   }
 
+  // ✅ UPDATE THIS METHOD
   Future<void> _playNext() async {
     if (_queue.isEmpty) return;
     
@@ -373,7 +382,7 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // MASTER LIST - PERMANENT SONGS
+  // MASTER LIST
   // ============================================================
   void addToMasterList(List<Song> songs) {
     for (var song in songs) {
@@ -392,10 +401,8 @@ class AudioManagerExtended extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Load queue
       await _loadQueue();
       
-      // Load master list
       List<String>? masterPaths = prefs.getStringList('masterList');
       if (masterPaths != null && masterPaths.isNotEmpty) {
         _masterList = masterPaths
@@ -404,7 +411,6 @@ class AudioManagerExtended extends ChangeNotifier {
             .toList();
       }
       
-      // Load recent
       List<String>? recentPaths = prefs.getStringList('recent');
       if (recentPaths != null && recentPaths.isNotEmpty) {
         _recent = recentPaths
@@ -413,7 +419,6 @@ class AudioManagerExtended extends ChangeNotifier {
             .toList();
       }
       
-      // Load favorites
       List<String>? favoritePaths = prefs.getStringList('favorites');
       if (favoritePaths != null && favoritePaths.isNotEmpty) {
         _favorites = favoritePaths
@@ -426,13 +431,11 @@ class AudioManagerExtended extends ChangeNotifier {
       _repeatMode = prefs.getInt('repeatMode') ?? 0;
       _volume = prefs.getDouble('volume') ?? 1.0;
       
-      // ✅ Load playlists (SEPARATE from queue)
       String? playlistsJson = prefs.getString('playlists');
       if (playlistsJson != null) {
         Map<String, dynamic> decoded = jsonDecode(playlistsJson);
         decoded.forEach((key, value) {
           List<String> paths = List<String>.from(value);
-          // ✅ Create playlist from master list - DOES NOT MODIFY QUEUE
           _playlists[key] = paths
               .where((path) => File(path).existsSync())
               .map((path) => Song(path: path, name: path.split('/').last))
@@ -450,18 +453,14 @@ class AudioManagerExtended extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Save queue
       await _saveQueue();
       
-      // Save master list
       List<String> masterPaths = _masterList.map((s) => s.path).toList();
       await prefs.setStringList('masterList', masterPaths);
       
-      // Save recent
       List<String> recentPaths = _recent.map((s) => s.path).toList();
       await prefs.setStringList('recent', recentPaths);
       
-      // Save favorites
       List<String> favoritePaths = _favorites.map((s) => s.path).toList();
       await prefs.setStringList('favorites', favoritePaths);
       
@@ -469,7 +468,6 @@ class AudioManagerExtended extends ChangeNotifier {
       await prefs.setInt('repeatMode', _repeatMode);
       await prefs.setDouble('volume', _volume);
       
-      // ✅ Save playlists (SEPARATE)
       Map<String, List<String>> playlistMap = {};
       _playlists.forEach((key, value) {
         playlistMap[key] = value.map((s) => s.path).toList();
@@ -482,15 +480,14 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // ✅ PLAYLIST METHODS - DOES NOT AFFECT QUEUE
+  // PLAYLIST METHODS
   // ============================================================
-  
   void createPlaylist(String name) {
     if (name.trim().isNotEmpty && !_playlists.containsKey(name)) {
       _playlists[name.trim()] = [];
       _saveData();
       notifyListeners();
-      print('✅ Playlist created: $name (Queue unchanged)');
+      print('✅ Playlist created: $name');
     }
   }
 
@@ -541,10 +538,31 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // ✅ PUBLIC METHODS - PLAYBACK
+  // ✅ PUBLIC PLAYBACK METHODS - WITH STATE SYNC
   // ============================================================
-  
+
+  // ✅ ADD THIS METHOD
+  Future<void> play() async {
+    if (_status == PlaybackStatus.paused) {
+      await _audioManager.play();
+      _updatePlaybackState(PlaybackStatus.playing);
+    } else if (_queue.isNotEmpty && _currentSong == null) {
+      await _playCurrent();
+    }
+  }
+
+  // ✅ ADD THIS METHOD
+  Future<void> pause() async {
+    if (_status == PlaybackStatus.playing) {
+      await _audioManager.pause();
+      _updatePlaybackState(PlaybackStatus.paused);
+    }
+  }
+
+  // ✅ UPDATE THIS METHOD
   Future<void> playSong(Song song, {List<Song>? queue}) async {
+    print('🎵 playSong called: ${song.displayName}');
+    
     if (queue != null && queue.isNotEmpty) {
       _queue = List.from(queue);
       _currentIndex = _queue.indexOf(song);
@@ -561,12 +579,20 @@ class AudioManagerExtended extends ChangeNotifier {
         _currentIndex = _queue.length - 1;
       }
     }
+    
+    _position = Duration.zero;
+    _duration = Duration.zero;
+    
     await _playCurrent();
     _saveData();
+    
+    print('✅ playSong completed. Current status: $_status');
   }
 
+  // ✅ UPDATE THIS METHOD
   Future<void> playNext() async => _playNext();
 
+  // ✅ UPDATE THIS METHOD
   Future<void> playPrevious() async {
     if (_queue.isEmpty) return;
     
@@ -578,23 +604,29 @@ class AudioManagerExtended extends ChangeNotifier {
     _saveData();
   }
 
+  // ✅ UPDATE THIS METHOD
   Future<void> togglePlayPause() async {
-    if (_queue.isEmpty) return;
+    if (_queue.isEmpty) {
+      print('⚠️ Queue is empty, cannot toggle play/pause');
+      return;
+    }
+    
+    print('🔄 Toggle play/pause called. Current status: $_status');
     
     if (_status == PlaybackStatus.playing) {
+      print('⏸️ Pausing...');
       await _audioManager.pause();
-      _status = PlaybackStatus.paused;
-      notifyListeners();
+      _updatePlaybackState(PlaybackStatus.paused);
     } else {
       if (_currentSong == null) {
+        print('▶️ No current song, playing current...');
         await _playCurrent();
       } else {
+        print('▶️ Resuming...');
         await _audioManager.play();
-        _status = PlaybackStatus.playing;
-        notifyListeners();
+        _updatePlaybackState(PlaybackStatus.playing);
       }
     }
-    _saveData();
   }
 
   void toggleShuffle() {
@@ -611,12 +643,10 @@ class AudioManagerExtended extends ChangeNotifier {
     } else {
       _favorites.add(song);
     }
-    // Update in queue
     final queueIndex = _queue.indexOf(song);
     if (queueIndex != -1) {
       _queue[queueIndex] = song.copyWith(isFavorite: !song.isFavorite);
     }
-    // Update in master list
     final masterIndex = _masterList.indexOf(song);
     if (masterIndex != -1) {
       _masterList[masterIndex] = _masterList[masterIndex].copyWith(isFavorite: !_masterList[masterIndex].isFavorite);
@@ -675,9 +705,6 @@ class AudioManagerExtended extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ============================================================
-  // SHOW CURRENT QUEUE - For Queue Button
-  // ============================================================
   List<Song> getCurrentQueue() {
     return List.from(_queue);
   }
