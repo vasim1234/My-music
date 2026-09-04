@@ -1,7 +1,3 @@
-// ============================================================
-// FULL PLAYER SCREEN - FIXED VERSION
-// ============================================================
-
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
@@ -161,7 +157,7 @@ class Song {
 }
 
 // ============================================================
-// AUDIO MANAGER EXTENDED
+// AUDIO MANAGER EXTENDED - FIXED VERSION
 // ============================================================
 enum PlaybackStatus { stopped, playing, paused }
 
@@ -182,8 +178,9 @@ class AudioManagerExtended extends ChangeNotifier {
   List<Song> _favorites = [];
   Map<String, List<Song>> _playlists = {};
   
-  StreamSubscription<Duration>? _positionSubscription;
-  StreamSubscription<Duration>? _durationSubscription;
+  // ✅ FIXED: Use nullable Duration for streams
+  StreamSubscription<Duration?>? _positionSubscription;
+  StreamSubscription<Duration?>? _durationSubscription;
   
   PlaybackStatus get status => _status;
   Song? get currentSong => _currentSong;
