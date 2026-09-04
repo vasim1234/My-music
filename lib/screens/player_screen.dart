@@ -2723,31 +2723,31 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             children: [
               // ✅ 3D Button - UPDATED
               _buildUtilityButton(
-                icon: Icons.three_mp,
-                label: '3D',
-                isActive: _is3DMode,
-                activeColor: Colors.purple,
-                onTap: () async {
-                  setState(() {
-                    _is3DMode = !_is3DMode;
-                  });
-                  
-                  // Apply 3D effect to audio
-                  await _audioManager.toggle3DMode();
-                  
-                  // Show feedback
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        _is3DMode ? '🎵 3D Audio ON - Spatial Sound' : '🎵 3D Audio OFF',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      backgroundColor: _is3DMode ? Colors.purple : Colors.grey.shade800,
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
-                },
-              ),
+  icon: Icons.three_mp,
+  label: '3D',
+  isActive: _is3DMode,
+  activeColor: Colors.purple,
+  onTap: () async {
+    setState(() {
+      _is3DMode = !_is3DMode;
+    });
+    
+    // ✅ Toggle 3D Audio Effect
+    await _audioManager.toggle3DMode();
+    
+    // Show feedback
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _is3DMode ? '🎵 3D Audio ON - Enhanced Sound' : '🎵 3D Audio OFF',
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: _is3DMode ? Colors.purple : Colors.grey.shade800,
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  },
+),
               
               // EQ Button
               _buildUtilityButton(
