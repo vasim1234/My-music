@@ -15,7 +15,7 @@ dependencies:
   rxdart: ^0.27.7
   
   # ✅ For real EQ effect - Added for Equalizer
-  audio_players: ^0.9.30
+  audioplayers: ^5.2.1  # ✅ CORRECT
   
   # File & Storage
   file_picker: ^5.5.0
