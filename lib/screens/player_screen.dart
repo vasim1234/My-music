@@ -1363,18 +1363,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             max: 10,
                             activeColor: color,
                             inactiveColor: Colors.grey.shade800,
-                            onChanged: (value) async {
-                              // Update local state
-                              Map<String, double> newGains = Map.from(currentGains);
-                              if (index == 0) newGains['Bass'] = value;
-                              else if (index == 1) newGains['Mid'] = value;
-                              else newGains['Treble'] = value;
-                              
-                              // Apply custom preset
-                              await _audioManager.setEqualizerPreset('Custom');
-                              setModalState(() {});
-                              setState(() {});
-                            },
+                                 onChanged: (value) async {
+        // ✅ Convert to Android EQ level (-1000 to +1000)
+        int level = (value * 100).toInt();
+        await _audioManager.updateBand(index, level);
+        setModalState(() {});
+        setState(() {});
+      },
                           ),
                         ],
                       );
