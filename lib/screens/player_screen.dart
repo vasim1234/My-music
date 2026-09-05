@@ -323,81 +323,88 @@ class AudioManagerExtended extends ChangeNotifier {
   // _playCurrent()
   // ============================================================
   Future<void> _playCurrent() async {
-    if (_queue.isEmpty) {
-      print('⚠️ Queue is empty');
-      _updatePlaybackState(PlaybackStatus.stopped);
-      return;
-    }
-    
-    if (_currentIndex >= _queue.length) {
+  if (_queue.isEmpty) {
+    print('⚠️ Queue is empty');
+    _updatePlaybackState(PlaybackStatus.stopped);
+    return;
+  }
+  
+  if (_currentIndex >= _queue.length) {
+    _currentIndex = 0;
+  }
+  
+  final song = _queue[_currentIndex];
+  print('🎵 _playCurrent called for: ${song.displayName}');
+  
+  if (!song.exists) {
+    print('❌ Song file does not exist: ${song.path}');
+    _queue.remove(song);
+    if (_queue.isNotEmpty) {
       _currentIndex = 0;
+      await _playCurrent();
+    } else {
+      _updatePlaybackState(PlaybackStatus.stopped);
     }
-    
-    final song = _queue[_currentIndex];
-    print('🎵 _playCurrent called for: ${song.displayName}');
-    
-    if (!song.exists) {
-      print('❌ Song file does not exist: ${song.path}');
-      _queue.remove(song);
-      if (_queue.isNotEmpty) {
-        _currentIndex = 0;
-        await _playCurrent();
-      } else {
-        _updatePlaybackState(PlaybackStatus.stopped);
-      }
-      _saveData();
-      return;
-    }
+    _saveData();
+    return;
+  }
 
-    try {
-      _currentSong = song;
-      print('📁 Loading audio file: ${song.path}');
-      
-      await _audioManager.playSong(song.path, song.displayName, song.artist);
-      _isAudioPrepared = true;
-      
-      _status = PlaybackStatus.playing;
-      notifyListeners();
-      _saveData();
-      print('✅ Audio loaded and playing, UI updated');
-      
-      _recent.remove(song);
-      _recent.insert(0, song);
-      if (_recent.length > AppConstants.maxRecentSongs) _recent.removeLast();
-      
-      _queue[_currentIndex] = song.copyWith(lastPlayed: DateTime.now());
-      
-      _isCompleting = false;
-    } catch (e) {
-      print('❌ Error playing song: $e');
-      _status = PlaybackStatus.stopped;
-      _currentSong = null;
-      _isAudioPrepared = false;
-      notifyListeners();
-    }
+  try {
+    _currentSong = song;
+    print('📁 Loading audio file: ${song.path}');
+    
+    await _audioManager.playSong(song.path, song.displayName, song.artist);
+    _isAudioPrepared = true;
+    
+    // ✅ FIX: Always update state and notify
+    _status = PlaybackStatus.playing;
+    notifyListeners();  // ← IMPORTANT
+    _saveData();
+    print('✅ Audio loaded and playing, UI updated');
+    
+    _recent.remove(song);
+    _recent.insert(0, song);
+    if (_recent.length > AppConstants.maxRecentSongs) _recent.removeLast();
+    
+    _queue[_currentIndex] = song.copyWith(lastPlayed: DateTime.now());
+    
+    _isCompleting = false;
+  } catch (e) {
+    print('❌ Error playing song: $e');
+    _status = PlaybackStatus.stopped;
+    _currentSong = null;
+    _isAudioPrepared = false;
+    notifyListeners();
+  }
   }
 
   // ============================================================
   // _playNext()
   // ============================================================
   Future<void> _playNext() async {
-    if (_queue.isEmpty) return;
-    
-    await _audioManager.stop();
-    await Future.delayed(const Duration(milliseconds: 200));
-    
-    if (_isShuffle && _queue.length > 1) {
-      int newIndex;
-      do {
-        newIndex = DateTime.now().millisecondsSinceEpoch % _queue.length;
-      } while (newIndex == _currentIndex && _queue.length > 1);
-      _currentIndex = newIndex;
-    } else {
-      _currentIndex = (_currentIndex + 1) % _queue.length;
-    }
-    
-    _isCompleting = false;
-    await _playCurrent();
+  if (_queue.isEmpty) return;
+  
+  print('⏭️ Playing next song...');
+  
+  await _audioManager.stop();
+  await Future.delayed(const Duration(milliseconds: 200));
+  
+  if (_isShuffle && _queue.length > 1) {
+    int newIndex;
+    do {
+      newIndex = DateTime.now().millisecondsSinceEpoch % _queue.length;
+    } while (newIndex == _currentIndex && _queue.length > 1);
+    _currentIndex = newIndex;
+  } else {
+    _currentIndex = (_currentIndex + 1) % _queue.length;
+  }
+  
+  _isCompleting = false;
+  await _playCurrent();
+  
+  // ✅ FIX: Notify UI to update
+  notifyListeners();
+  print('✅ Next song started, UI updated');
   }
 
   // ============================================================
