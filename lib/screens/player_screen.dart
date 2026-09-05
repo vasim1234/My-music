@@ -1214,214 +1214,189 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   // EQ DIALOG
   // ============================================================
   void _showEqualizerDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppConstants.bgColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.all(20),
-              height: MediaQuery.of(context).size.height * 0.7,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildEQHeader(setModalState),
-                  const Divider(color: Colors.white24),
-                  _buildEQPresets(setModalState),
-                  const SizedBox(height: 16),
-                  const Divider(color: Colors.white24),
-                  _buildEQSliders(setModalState),
-                  const SizedBox(height: 8),
-                  _buildEQToggle(setModalState),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildEQHeader(StateSetter setModalState) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: AppConstants.primaryGradient),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.equalizer, color: Colors.white, size: 22),
-            ),
-            const SizedBox(width: 12),
-            const Text('Equalizer', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-            if (_isEqActive)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: AppConstants.bgColor,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    isScrollControlled: true,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          // ✅ Use real EQ state from audio manager
+          String currentPreset = _audioManager.currentEqPreset;
+          Map<String, double> currentGains = _audioManager.eqGains;
+          
+          return Container(
+            padding: const EdgeInsets.all(20),
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: AppConstants.primaryGradient),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.equalizer, color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text('Equalizer', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        if (currentPreset != 'Normal')
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text('$currentPreset ON', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+                          onPressed: () async {
+                            await _audioManager.resetEqualizer();
+                            setModalState(() {});
+                            setState(() {});
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white70),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                child: const Text('ON', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
-          ],
-        ),
-        Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
-              onPressed: () async {
-                setState(() {
-                  _currentEqPreset = 'Normal';
-                  _currentEqValues = [0, 0, 0];
-                  _isEqActive = false;
-                });
-                setModalState(() {});
-                await _applyEqualizer();
-                _saveEQState();
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.white70),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEQPresets(StateSetter setModalState) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('PRESETS', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: AppConstants.eqPresets.keys.map((preset) {
-            bool isSelected = _currentEqPreset == preset;
-            return FilterChip(
-              label: Text(preset, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 11)),
-              selected: isSelected,
-              selectedColor: AppConstants.accentColor.withOpacity(0.3),
-              backgroundColor: AppConstants.cardColor,
-              side: BorderSide(color: isSelected ? AppConstants.accentColor : Colors.grey.shade700, width: 1.5),
-              onSelected: (selected) async {
-                if (selected) {
-                  setState(() {
-                    _currentEqPreset = preset;
-                    _currentEqValues = List.from(AppConstants.eqPresets[preset]!);
-                    _isEqActive = preset != 'Normal';
-                  });
-                  setModalState(() {});
-                  await _applyEqualizer();
-                  _saveEQState();
-                }
-              },
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEQSliders(StateSetter setModalState) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('3 BAND EQUALIZER', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Expanded(
-          child: ListView.builder(
-            itemCount: 3,
-            itemBuilder: (context, index) {
-              final colors = [Colors.red, Colors.green, Colors.blue];
-              final color = colors[index % colors.length];
-              
-              return Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        AppConstants.bandLabels[index],
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: [color, color.withOpacity(0.6)]),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _currentEqValues[index] > 0 
-                              ? '+${_currentEqValues[index].toInt()}' 
-                              : '${_currentEqValues[index].toInt()}',
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Slider(
-                    value: _currentEqValues[index],
-                    min: -10,
-                    max: 10,
-                    activeColor: color,
-                    inactiveColor: Colors.grey.shade800,
-                    onChanged: (value) async {
-                      setState(() {
-                        _currentEqValues[index] = value;
-                        _currentEqPreset = 'Custom';
-                        _isEqActive = true;
-                      });
-                      setModalState(() {});
-                      await _applyEqualizer();
-                      _saveEQState();
+                
+                const Divider(color: Colors.white24),
+                
+                // ✅ PRESETS - Real EQ Presets
+                const Text('PRESETS', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: AppConstants.eqPresets.keys.map((preset) {
+                    bool isSelected = currentPreset == preset;
+                    return FilterChip(
+                      label: Text(preset, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 11)),
+                      selected: isSelected,
+                      selectedColor: AppConstants.accentColor.withOpacity(0.3),
+                      backgroundColor: AppConstants.cardColor,
+                      side: BorderSide(color: isSelected ? AppConstants.accentColor : Colors.grey.shade700, width: 1.5),
+                      onSelected: (selected) async {
+                        if (selected) {
+                          // ✅ Apply real EQ effect
+                          await _audioManager.setEqualizerPreset(preset);
+                          setModalState(() {});
+                          setState(() {});
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
+                
+                const SizedBox(height: 16),
+                const Divider(color: Colors.white24),
+                
+                // ✅ 3 BAND EQUALIZER - Real Sliders
+                const Text('3 BAND EQUALIZER', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: 3,
+                    itemBuilder: (context, index) {
+                      final colors = [Colors.red, Colors.green, Colors.blue];
+                      final color = colors[index % colors.length];
+                      final bandName = AppConstants.bandLabels[index];
+                      final bandValue = index == 0 ? (currentGains['Bass'] ?? 0.0) :
+                                       index == 1 ? (currentGains['Mid'] ?? 0.0) :
+                                       (currentGains['Treble'] ?? 0.0);
+                      
+                      return Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(bandName, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(colors: [color, color.withOpacity(0.6)]),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  bandValue > 0 ? '+${bandValue.toInt()}' : '${bandValue.toInt()}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Slider(
+                            value: bandValue,
+                            min: -10,
+                            max: 10,
+                            activeColor: color,
+                            inactiveColor: Colors.grey.shade800,
+                            onChanged: (value) async {
+                              // Update local state
+                              Map<String, double> newGains = Map.from(currentGains);
+                              if (index == 0) newGains['Bass'] = value;
+                              else if (index == 1) newGains['Mid'] = value;
+                              else newGains['Treble'] = value;
+                              
+                              // Apply custom preset
+                              await _audioManager.setEqualizerPreset('Custom');
+                              setModalState(() {});
+                              setState(() {});
+                            },
+                          ),
+                        ],
+                      );
                     },
                   ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEQToggle(StateSetter setModalState) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text('Enable Equalizer', style: TextStyle(color: Colors.white, fontSize: 14)),
-        Switch(
-          value: _isEqActive,
-          activeColor: AppConstants.accentColor,
-          activeTrackColor: AppConstants.accentColor.withOpacity(0.3),
-          onChanged: (value) async {
-            setState(() {
-              _isEqActive = value;
-              if (!value) {
-                _currentEqValues = [0, 0, 0];
-                _currentEqPreset = 'Normal';
-              }
-            });
-            setModalState(() {});
-            await _applyEqualizer();
-            _saveEQState();
-          },
-        ),
-      ],
-    );
+                ),
+                
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Enable Equalizer', style: TextStyle(color: Colors.white, fontSize: 14)),
+                    Switch(
+                      value: currentPreset != 'Normal',
+                      activeColor: AppConstants.accentColor,
+                      activeTrackColor: AppConstants.accentColor.withOpacity(0.3),
+                      onChanged: (value) async {
+                        if (value) {
+                          await _audioManager.setEqualizerPreset('Pop');
+                        } else {
+                          await _audioManager.resetEqualizer();
+                        }
+                        setModalState(() {});
+                        setState(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
   }
 
   // ============================================================
