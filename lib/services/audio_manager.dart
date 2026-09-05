@@ -2,9 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:just_audio/just_audio.dart';
 import 'package:equalizer_flutter/equalizer_flutter.dart';
-import 'package:flutter/material.dart';
 
-class AudioManager extends ChangeNotifier {
+class AudioManager {
   static final AudioManager _instance = AudioManager._internal();
   factory AudioManager() => _instance;
 
@@ -211,7 +210,7 @@ class AudioManager extends ChangeNotifier {
   // PLAYBACK METHODS
   // ============================================================
   
-    Future<void> preload(String path, String title, String artist) async {
+  Future<void> preload(String path, String title, String artist) async {
     try {
       print('🎵 Preloading: $title');
       final file = File(path);
@@ -223,7 +222,6 @@ class AudioManager extends ChangeNotifier {
       await _player.setAudioSource(AudioSource.file(path));
       _currentSongPath = path;
       _isPlaying = false;
-      notifyListeners();
       print('✅ Preload complete: $title');
     } catch (e) {
       print('❌ Preload Error: $e');
@@ -253,7 +251,6 @@ class AudioManager extends ChangeNotifier {
       await _player.play();
       _currentSongPath = path;
       _isPlaying = true;
-      notifyListeners();
       print('▶️ Playing: $title');
 
     } catch (e) {
@@ -269,21 +266,18 @@ class AudioManager extends ChangeNotifier {
     }
     await _player.play();
     _isPlaying = true;
-    notifyListeners(); // ✅ Added to update UI state instantly
   }
 
   Future<void> pause() async {
     print('⏸️ Pause called');
     await _player.pause();
     _isPlaying = false;
-    notifyListeners(); // ✅ Added to update UI state instantly
   }
 
   Future<void> stop() async {
     print('⏹️ Stop called');
     await _player.stop();
     _isPlaying = false;
-    notifyListeners(); // ✅ Added to update UI state instantly
   }
 
   Future<void> seek(Duration position) async {
@@ -304,4 +298,3 @@ class AudioManager extends ChangeNotifier {
     await _player.dispose();
   }
 }
-
