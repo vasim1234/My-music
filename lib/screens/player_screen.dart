@@ -157,7 +157,7 @@ class Song {
 }
 
 // ============================================================
-// AUDIO MANAGER EXTENDED - COMPLETE WITH EQ METHODS
+// AUDIO MANAGER EXTENDED - COMPLETE WITH ALL METHODS
 // ============================================================
 enum PlaybackStatus { stopped, playing, paused }
 
@@ -664,13 +664,21 @@ class AudioManagerExtended extends ChangeNotifier {
     await _audioManager.toggle3DMode();
   }
 
-  // ✅ EQ METHODS - ADDED
+  // ============================================================
+  // ✅ EQ METHODS - COMPLETE (WITH updateBand)
+  // ============================================================
+  
   Future<void> setEqualizerPreset(String presetName) async {
     await _audioManager.setEqualizerPreset(presetName);
   }
 
   Future<void> resetEqualizer() async {
     await _audioManager.resetEqualizer();
+  }
+
+  // ✅ ADDED - updateBand method
+  Future<void> updateBand(int bandId, int level) async {
+    await _audioManager.updateBand(bandId, level);
   }
 
   // ============================================================
@@ -1363,13 +1371,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             max: 10,
                             activeColor: color,
                             inactiveColor: Colors.grey.shade800,
-                                 onChanged: (value) async {
-        // ✅ Convert to Android EQ level (-1000 to +1000)
-        int level = (value * 100).toInt();
-        await _audioManager.updateBand(index, level);
-        setModalState(() {});
-        setState(() {});
-      },
+                            onChanged: (value) async {
+                              // ✅ Convert to Android EQ level (-1000 to +1000)
+                              int level = (value * 100).toInt();
+                              await _audioManager.updateBand(index, level);
+                              setModalState(() {});
+                              setState(() {});
+                            },
                           ),
                         ],
                       );
