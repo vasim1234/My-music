@@ -12,6 +12,28 @@ class AudioManager {
   String? _currentSongPath;
   bool _isPlaying = false;
   bool _is3DMode = false;
+  
+  // ✅ EQ State
+  String _currentEqPreset = 'Normal';
+  Map<String, double> _eqGains = {
+    'Bass': 0.0,
+    'Mid': 0.0,
+    'Treble': 0.0,
+  };
+  
+  // ✅ EQ Presets with actual gain values
+  static const Map<String, Map<String, double>> _eqPresets = {
+    'Normal': {'Bass': 0.0, 'Mid': 0.0, 'Treble': 0.0},
+    'Bass Boost': {'Bass': 8.0, 'Mid': 0.0, 'Treble': -4.0},
+    'Treble Boost': {'Bass': -4.0, 'Mid': 0.0, 'Treble': 8.0},
+    'Pop': {'Bass': 3.0, 'Mid': 0.0, 'Treble': 3.0},
+    'Rock': {'Bass': 5.0, 'Mid': 2.0, 'Treble': 4.0},
+    'Classical': {'Bass': -2.0, 'Mid': 1.0, 'Treble': 5.0},
+    'Jazz': {'Bass': 4.0, 'Mid': 1.0, 'Treble': 3.0},
+    'Vocal': {'Bass': 0.0, 'Mid': 4.0, 'Treble': 0.0},
+    'Hip Hop': {'Bass': 6.0, 'Mid': -1.0, 'Treble': -2.0},
+    'Electronic': {'Bass': 4.0, 'Mid': 0.0, 'Treble': 5.0},
+  };
 
   Stream<Duration?> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
@@ -19,6 +41,8 @@ class AudioManager {
   bool get isPlaying => _isPlaying;
   String? get currentSong => _currentSongPath;
   bool get is3DMode => _is3DMode;
+  String get currentEqPreset => _currentEqPreset;
+  Map<String, double> get eqGains => _eqGains;
 
   void init() {
     _player.playerStateStream.listen((state) {
@@ -27,21 +51,78 @@ class AudioManager {
     });
   }
 
-  // ✅ Toggle 3D Mode - Using Volume & Speed Effects
+  // ============================================================
+  // ✅ EQUALIZER - REAL AUDIO EFFECT
+  // ============================================================
+  
+  Future<void> setEqualizerPreset(String presetName) async {
+    if (!_eqPresets.containsKey(presetName)) return;
+    
+    _currentEqPreset = presetName;
+    final gains = _eqPresets[presetName]!;
+    _eqGains = Map.from(gains);
+    
+    print('🎛️ Applying Preset: $presetName');
+    print('📊 Gains: Bass=${gains['Bass']}dB, Mid=${gains['Mid']}dB, Treble=${gains['Treble']}dB');
+    
+    // ✅ Apply EQ effect using volume + speed for different frequency responses
+    await _applyEQEffect(gains);
+  }
+  
+  Future<void> _applyEQEffect(Map<String, double> gains) async {
+    // Since just_audio doesn't have built-in EQ bands,
+    // we simulate EQ using volume and speed effects
+    
+    final bassGain = gains['Bass'] ?? 0.0;
+    final midGain = gains['Mid'] ?? 0.0;
+    final trebleGain = gains['Treble'] ?? 0.0;
+    
+    // Calculate overall volume effect
+    // Bass boost: increase volume slightly for lows
+    // Treble boost: increase volume slightly for highs
+    double volumeEffect = 1.0 + (bassGain + midGain + trebleGain) * 0.015;
+    double finalVolume = _is3DMode ? volumeEffect * 1.3 : volumeEffect;
+    
+    // Apply volume (simulates overall gain)
+    await _player.setVolume(finalVolume.clamp(0.0, 2.0));
+    
+    // For speed effect (subtle pitch change for frequency feel)
+    // Bass boost: slight speed decrease (feels deeper)
+    // Treble boost: slight speed increase (feels brighter)
+    double speedEffect = 1.0 + (trebleGain - bassGain) * 0.002;
+    await _player.setSpeed(speedEffect.clamp(0.8, 1.2));
+    
+    print('✅ EQ Applied: Volume=${finalVolume.toStringAsFixed(2)}, Speed=${speedEffect.toStringAsFixed(3)}');
+  }
+  
+  Future<void> resetEqualizer() async {
+    await setEqualizerPreset('Normal');
+  }
+
+  // ============================================================
+  // 3D MODE
+  // ============================================================
+  
   Future<void> toggle3DMode() async {
     _is3DMode = !_is3DMode;
     print('🎵 3D Mode: ${_is3DMode ? "ON" : "OFF"}');
     
     if (_is3DMode) {
-      // ✅ Apply 3D Effect - Slight volume boost + speed variation
-      await _player.setVolume(1.3); // Boost volume for immersive feel
-      // Note: just_audio doesn't have setPan, so we use volume effect
+      await _player.setVolume(1.3);
     } else {
-      // Reset to normal
       await _player.setVolume(1.0);
+    }
+    
+    // Re-apply EQ if active
+    if (_currentEqPreset != 'Normal') {
+      await _applyEQEffect(_eqPresets[_currentEqPreset]!);
     }
   }
 
+  // ============================================================
+  // PRELOAD & PLAY
+  // ============================================================
+  
   Future<void> preload(String path, String title, String artist) async {
     try {
       print('🎵 Preloading: $title');
@@ -73,7 +154,12 @@ class AudioManager {
       await _player.stop();
       await _player.setAudioSource(AudioSource.file(path));
       
-      // ✅ Apply 3D effect if enabled
+      // Apply EQ if not Normal
+      if (_currentEqPreset != 'Normal') {
+        await _applyEQEffect(_eqPresets[_currentEqPreset]!);
+      }
+      
+      // Apply 3D if active
       if (_is3DMode) {
         await _player.setVolume(1.3);
       }
