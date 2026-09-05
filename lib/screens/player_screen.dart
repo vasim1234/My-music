@@ -157,7 +157,7 @@ class Song {
 }
 
 // ============================================================
-// AUDIO MANAGER EXTENDED - COMPLETE FIXED VERSION
+// AUDIO MANAGER EXTENDED - COMPLETE WITH 3D TOGGLE
 // ============================================================
 enum PlaybackStatus { stopped, playing, paused }
 
@@ -316,7 +316,7 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // ✅ _playCurrent() - YAHAN DAALA HAI
+  // _playCurrent()
   // ============================================================
   Future<void> _playCurrent() async {
     if (_queue.isEmpty) {
@@ -352,7 +352,6 @@ class AudioManagerExtended extends ChangeNotifier {
       await _audioManager.playSong(song.path, song.displayName, song.artist);
       _isAudioPrepared = true;
       
-      // ✅ FIX: Always update state and notify
       _status = PlaybackStatus.playing;
       notifyListeners();
       _saveData();
@@ -593,7 +592,7 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // PUBLIC PLAYBACK METHODS
+  // ✅ PUBLIC PLAYBACK METHODS
   // ============================================================
   
   Future<void> play() async {
@@ -654,6 +653,11 @@ class AudioManagerExtended extends ChangeNotifier {
     _isAudioPrepared = false;
     await _playCurrent();
     _saveData();
+  }
+
+  // ✅ ADD THIS METHOD - 3D MODE TOGGLE
+  Future<void> toggle3DMode() async {
+    await _audioManager.toggle3DMode();
   }
 
   // ============================================================
