@@ -22,7 +22,6 @@ class AudioManager {
     'Treble': 0.0,
   };
   
-  // Real EQ Presets with actual band levels (Android EQ uses -1000 to +1000)
   static const Map<String, Map<String, int>> _eqPresets = {
     'Normal': {'Bass': 0, 'Mid': 0, 'Treble': 0},
     'Bass Boost': {'Bass': 800, 'Mid': 0, 'Treble': -400},
@@ -36,7 +35,6 @@ class AudioManager {
     'Electronic': {'Bass': 400, 'Mid': 0, 'Treble': 500},
   };
 
-  // Real EQ Band IDs
   static const int _bassBand = 0;
   static const int _midBand = 1;
   static const int _trebleBand = 2;
@@ -51,86 +49,42 @@ class AudioManager {
   Map<String, double> get eqGains => _eqGains;
 
   bool _isEqualizerInitialized = false;
+  int? _currentSessionId;
 
   // ============================================================
-  // ✅ INIT - WITH EQUALIZER CONNECTION
+  // INIT
   // ============================================================
   
   void init() {
-    // Player state listener
     _player.playerStateStream.listen((state) {
       _isPlaying = state.playing;
       print('State: ${state.processingState}, playing: ${state.playing}');
     });
 
-    // ✅ CONNECT EQUALIZER TO PLAYER - MAIN FIX
+    // ✅ FIX: Connect Equalizer with Session ID
     _player.androidAudioSessionIdStream.listen((sessionId) async {
       if (sessionId != null && sessionId != 0) {
+        _currentSessionId = sessionId;
+        print('🎛️ Audio Session ID: $sessionId');
+        
         try {
-          print('🎛️ Audio Session ID received: $sessionId');
-          
-          // Initialize Equalizer with player's session ID
           await EqualizerFlutter.init(sessionId);
-          
-          // Enable Equalizer
           await EqualizerFlutter.setEnabled(true);
-          
           _isEqualizerInitialized = true;
-          print('✅ Equalizer connected successfully!');
+          print('✅ Equalizer connected!');
           
           // Apply current preset
           await _applyRealEqualizerPreset(_currentEqPreset);
         } catch (e) {
-          print('❌ Equalizer connection error: $e');
+          print('❌ Equalizer error: $e');
           _isEqualizerInitialized = false;
         }
       }
     });
-    
-    // Also try immediate init after delay
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      _initRealEqualizer();
-    });
   }
 
   // ============================================================
-  // REAL EQUALIZER INITIALIZATION (Fallback)
-  // ============================================================
-  
-  Future<void> _initRealEqualizer() async {
-    if (!Platform.isAndroid) {
-      print('⚠️ Equalizer only works on Android');
-      return;
-    }
-    
-    if (_isEqualizerInitialized) {
-      print('✅ Equalizer already initialized');
-      return;
-    }
-    
-    try {
-      print('🎛️ Initializing Real Equalizer...');
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      int? sessionId = await _player.androidAudioSessionId;
-      if (sessionId != null && sessionId != 0) {
-        await EqualizerFlutter.init(sessionId);
-        await EqualizerFlutter.setEnabled(true);
-        _isEqualizerInitialized = true;
-        print('✅ Real Equalizer initialized! Session ID: $sessionId');
-        
-        await _applyRealEqualizerPreset(_currentEqPreset);
-      } else {
-        print('❌ Failed to get audio session ID');
-      }
-    } catch (e) {
-      print('❌ Equalizer Init Error: $e');
-      _isEqualizerInitialized = false;
-    }
-  }
-
-  // ============================================================
-  // REAL EQUALIZER PRESETS
+  // EQUALIZER METHODS
   // ============================================================
   
   Future<void> setEqualizerPreset(String presetName) async {
@@ -147,42 +101,48 @@ class AudioManager {
       'Treble': (gains['Treble'] ?? 0) / 100.0,
     };
     
-    print('🎛️ Applying Real Preset: $presetName');
-    print('📊 Gains: Bass=${gains['Bass']}, Mid=${gains['Mid']}, Treble=${gains['Treble']}');
-    
+    print('🎛️ Applying Preset: $presetName');
     await _applyRealEqualizerPreset(presetName);
   }
   
   Future<void> _applyRealEqualizerPreset(String presetName) async {
-    if (!Platform.isAndroid || !_isEqualizerInitialized) {
-      print('⚠️ Equalizer not available, using volume simulation');
-      await _simulateEQ(_eqPresets[presetName]!);
-      return;
+    if (!_isEqualizerInitialized) {
+      print('⚠️ Equalizer not initialized, trying to reconnect...');
+      await _reconnectEqualizer();
+      if (!_isEqualizerInitialized) {
+        await _simulateEQ(_eqPresets[presetName]!);
+        return;
+      }
     }
     
     try {
       final gains = _eqPresets[presetName]!;
       
-      // ✅ Apply real EQ bands
       await EqualizerFlutter.setBandLevel(_bassBand, gains['Bass']!);
       await EqualizerFlutter.setBandLevel(_midBand, gains['Mid']!);
       await EqualizerFlutter.setBandLevel(_trebleBand, gains['Treble']!);
       
-      print('✅ Real EQ Applied: $presetName');
-      
-      if (_is3DMode) {
-        await _player.setVolume(1.3);
-      }
+      print('✅ EQ Applied: $presetName');
     } catch (e) {
-      print('❌ Error applying real EQ: $e');
+      print('❌ EQ Error: $e');
       await _simulateEQ(_eqPresets[presetName]!);
     }
   }
 
-  // ============================================================
-  // SIMULATE EQ (Fallback)
-  // ============================================================
-  
+  Future<void> _reconnectEqualizer() async {
+    try {
+      if (_currentSessionId != null && _currentSessionId != 0) {
+        await EqualizerFlutter.init(_currentSessionId!);
+        await EqualizerFlutter.setEnabled(true);
+        _isEqualizerInitialized = true;
+        print('✅ Equalizer reconnected!');
+      }
+    } catch (e) {
+      print('❌ Reconnect failed: $e');
+      _isEqualizerInitialized = false;
+    }
+  }
+
   Future<void> _simulateEQ(Map<String, int> gains) async {
     final bassGain = gains['Bass'] ?? 0;
     final midGain = gains['Mid'] ?? 0;
@@ -190,36 +150,26 @@ class AudioManager {
     
     double volumeEffect = 1.0 + (bassGain + midGain + trebleGain) * 0.00015;
     double finalVolume = _is3DMode ? volumeEffect * 1.3 : volumeEffect;
-    
     await _player.setVolume(finalVolume.clamp(0.0, 2.0));
-    
-    double speedEffect = 1.0 + (trebleGain - bassGain) * 0.00002;
-    await _player.setSpeed(speedEffect.clamp(0.8, 1.2));
   }
 
-  // ============================================================
-  // UPDATE INDIVIDUAL BAND
-  // ============================================================
-  
   Future<void> updateBand(int bandId, int level) async {
-    if (!Platform.isAndroid || !_isEqualizerInitialized) {
-      print('⚠️ Equalizer not available');
-      return;
+    if (!_isEqualizerInitialized) {
+      await _reconnectEqualizer();
+      if (!_isEqualizerInitialized) return;
     }
     
     try {
       await EqualizerFlutter.setBandLevel(bandId, level);
-      
       _currentEqPreset = 'Custom';
       _eqGains = {
         'Bass': (bandId == 0) ? level / 100.0 : _eqGains['Bass']!,
         'Mid': (bandId == 1) ? level / 100.0 : _eqGains['Mid']!,
         'Treble': (bandId == 2) ? level / 100.0 : _eqGains['Treble']!,
       };
-      
       print('✅ Band $bandId set to $level');
     } catch (e) {
-      print('❌ Error updating band: $e');
+      print('❌ Band error: $e');
     }
   }
 
@@ -234,7 +184,6 @@ class AudioManager {
   Future<void> toggle3DMode() async {
     _is3DMode = !_is3DMode;
     print('🎵 3D Mode: ${_is3DMode ? "ON" : "OFF"}');
-    
     if (_is3DMode) {
       await _player.setVolume(1.3);
     } else {
@@ -251,14 +200,14 @@ class AudioManager {
       print('🎵 Preloading: $title');
       final file = File(path);
       if (!await file.exists()) {
-        print('❌ File not found for preloading');
+        print('❌ File not found');
         return;
       }
       await _player.stop();
       await _player.setAudioSource(AudioSource.file(path));
       _currentSongPath = path;
       _isPlaying = false;
-      print('✅ Preload complete: $title');
+      print('✅ Preload complete');
     } catch (e) {
       print('❌ Preload Error: $e');
     }
@@ -277,8 +226,8 @@ class AudioManager {
       await _player.stop();
       await _player.setAudioSource(AudioSource.file(path));
       
-      // ✅ Re-initialize equalizer after audio source is set
-      await _initRealEqualizer();
+      // ✅ Reconnect equalizer after new song
+      await _reconnectEqualizer();
       
       if (_is3DMode) {
         await _player.setVolume(1.3);
