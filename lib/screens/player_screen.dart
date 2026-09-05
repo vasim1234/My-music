@@ -157,7 +157,7 @@ class Song {
 }
 
 // ============================================================
-// AUDIO MANAGER EXTENDED - COMPLETE WITH 3D TOGGLE
+// AUDIO MANAGER EXTENDED - COMPLETE WITH EQ METHODS
 // ============================================================
 enum PlaybackStatus { stopped, playing, paused }
 
@@ -206,6 +206,10 @@ class AudioManagerExtended extends ChangeNotifier {
   List<Song> get recent => _recent;
   List<Song> get favorites => _favorites;
   Map<String, List<Song>> get playlists => _playlists;
+
+  // ✅ EQ GETTERS
+  String get currentEqPreset => _audioManager.currentEqPreset;
+  Map<String, double> get eqGains => _audioManager.eqGains;
 
   // ============================================================
   // CONSTRUCTOR & INIT
@@ -592,7 +596,7 @@ class AudioManagerExtended extends ChangeNotifier {
   }
 
   // ============================================================
-  // ✅ PUBLIC PLAYBACK METHODS
+  // PUBLIC PLAYBACK METHODS
   // ============================================================
   
   Future<void> play() async {
@@ -655,9 +659,18 @@ class AudioManagerExtended extends ChangeNotifier {
     _saveData();
   }
 
-  // ✅ ADD THIS METHOD - 3D MODE TOGGLE
+  // 3D MODE TOGGLE
   Future<void> toggle3DMode() async {
     await _audioManager.toggle3DMode();
+  }
+
+  // ✅ EQ METHODS - ADDED
+  Future<void> setEqualizerPreset(String presetName) async {
+    await _audioManager.setEqualizerPreset(presetName);
+  }
+
+  Future<void> resetEqualizer() async {
+    await _audioManager.resetEqualizer();
   }
 
   // ============================================================
