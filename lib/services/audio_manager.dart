@@ -14,7 +14,7 @@ class AudioManager {
   bool _isPlaying = false;
   bool _is3DMode = false;
   
-  // ✅ EQ State
+  // EQ State
   String _currentEqPreset = 'Normal';
   Map<String, double> _eqGains = {
     'Bass': 0.0,
@@ -22,7 +22,7 @@ class AudioManager {
     'Treble': 0.0,
   };
   
-  // ✅ Real EQ Presets with actual band levels (Android EQ uses -1000 to +1000)
+  // Real EQ Presets with actual band levels (Android EQ uses -1000 to +1000)
   static const Map<String, Map<String, int>> _eqPresets = {
     'Normal': {'Bass': 0, 'Mid': 0, 'Treble': 0},
     'Bass Boost': {'Bass': 800, 'Mid': 0, 'Treble': -400},
@@ -36,10 +36,10 @@ class AudioManager {
     'Electronic': {'Bass': 400, 'Mid': 0, 'Treble': 500},
   };
 
-  // ✅ Real EQ Band IDs (Android Equalizer bands)
-  static const int _bassBand = 0;    // ~60Hz
-  static const int _midBand = 1;     // ~1kHz
-  static const int _trebleBand = 2;  // ~8kHz
+  // Real EQ Band IDs
+  static const int _bassBand = 0;
+  static const int _midBand = 1;
+  static const int _trebleBand = 2;
 
   Stream<Duration?> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
@@ -50,7 +50,6 @@ class AudioManager {
   String get currentEqPreset => _currentEqPreset;
   Map<String, double> get eqGains => _eqGains;
 
-  // ✅ Android Equalizer Instance
   bool _isEqualizerInitialized = false;
 
   void init() {
@@ -59,12 +58,11 @@ class AudioManager {
       print('State: ${state.processingState}, playing: ${state.playing}');
     });
     
-    // ✅ Initialize Real Equalizer
     _initRealEqualizer();
   }
 
   // ============================================================
-  // ✅ REAL EQUALIZER INITIALIZATION
+  // REAL EQUALIZER INITIALIZATION
   // ============================================================
   
   Future<void> _initRealEqualizer() async {
@@ -75,7 +73,6 @@ class AudioManager {
     
     try {
       print('🎛️ Initializing Real Equalizer...');
-      // Wait for audio session to be ready
       await Future.delayed(const Duration(milliseconds: 500));
       
       int? sessionId = await _player.androidAudioSessionId;
@@ -85,7 +82,6 @@ class AudioManager {
         _isEqualizerInitialized = true;
         print('✅ Real Equalizer initialized! Session ID: $sessionId');
         
-        // ✅ Apply current preset
         await _applyRealEqualizerPreset(_currentEqPreset);
       } else {
         print('❌ Failed to get audio session ID');
@@ -97,7 +93,7 @@ class AudioManager {
   }
 
   // ============================================================
-  // ✅ REAL EQUALIZER PRESETS
+  // REAL EQUALIZER PRESETS
   // ============================================================
   
   Future<void> setEqualizerPreset(String presetName) async {
@@ -130,26 +126,24 @@ class AudioManager {
     try {
       final gains = _eqPresets[presetName]!;
       
-      // ✅ Apply real EQ bands
-      await EqualizerFlutter.setBandLevel(_bassBand, gains['Bass']!.toDouble());
-      await EqualizerFlutter.setBandLevel(_midBand, gains['Mid']!.toDouble());
-      await EqualizerFlutter.setBandLevel(_trebleBand, gains['Treble']!.toDouble());
+      // ✅ FIXED: Passing int directly (no .toDouble())
+      await EqualizerFlutter.setBandLevel(_bassBand, gains['Bass']!);
+      await EqualizerFlutter.setBandLevel(_midBand, gains['Mid']!);
+      await EqualizerFlutter.setBandLevel(_trebleBand, gains['Treble']!);
       
       print('✅ Real EQ Applied: $presetName');
       
-      // Also update volume for 3D mode compatibility
       if (_is3DMode) {
         await _player.setVolume(1.3);
       }
     } catch (e) {
       print('❌ Error applying real EQ: $e');
-      // Fallback to volume simulation
       await _simulateEQ(_eqPresets[presetName]!);
     }
   }
 
   // ============================================================
-  // ✅ SIMULATE EQ (Fallback when real EQ not available)
+  // SIMULATE EQ (Fallback)
   // ============================================================
   
   Future<void> _simulateEQ(Map<String, int> gains) async {
@@ -167,7 +161,7 @@ class AudioManager {
   }
 
   // ============================================================
-  // ✅ UPDATE INDIVIDUAL BAND (for sliders)
+  // UPDATE INDIVIDUAL BAND
   // ============================================================
   
   Future<void> updateBand(int bandId, int level) async {
@@ -177,9 +171,9 @@ class AudioManager {
     }
     
     try {
-      await EqualizerFlutter.setBandLevel(bandId, level.toDouble());
+      // ✅ FIXED: Passing int directly
+      await EqualizerFlutter.setBandLevel(bandId, level);
       
-      // Update current preset to Custom
       _currentEqPreset = 'Custom';
       _eqGains = {
         'Bass': (bandId == 0) ? level / 100.0 : _eqGains['Bass']!,
@@ -247,7 +241,6 @@ class AudioManager {
       await _player.stop();
       await _player.setAudioSource(AudioSource.file(path));
       
-      // ✅ Initialize equalizer after audio source is set
       await _initRealEqualizer();
       
       if (_is3DMode) {
