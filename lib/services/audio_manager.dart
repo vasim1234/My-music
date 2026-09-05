@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'package:just_audio/just_audio.dart';
 import 'package:equalizer_flutter/equalizer_flutter.dart';
+import 'package:flutter/material.dart';
 
-class AudioManager {
+class AudioManager extends ChangeNotifier {
   static final AudioManager _instance = AudioManager._internal();
   factory AudioManager() => _instance;
 
