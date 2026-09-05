@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:just_audio/just_audio.dart';
+import 'package:equalizer_flutter/equalizer_flutter.dart';
 
 class AudioManager {
   static final AudioManager _instance = AudioManager._internal();
@@ -21,19 +22,24 @@ class AudioManager {
     'Treble': 0.0,
   };
   
-  // ✅ EQ Presets with actual gain values
-  static const Map<String, Map<String, double>> _eqPresets = {
-    'Normal': {'Bass': 0.0, 'Mid': 0.0, 'Treble': 0.0},
-    'Bass Boost': {'Bass': 8.0, 'Mid': 0.0, 'Treble': -4.0},
-    'Treble Boost': {'Bass': -4.0, 'Mid': 0.0, 'Treble': 8.0},
-    'Pop': {'Bass': 3.0, 'Mid': 0.0, 'Treble': 3.0},
-    'Rock': {'Bass': 5.0, 'Mid': 2.0, 'Treble': 4.0},
-    'Classical': {'Bass': -2.0, 'Mid': 1.0, 'Treble': 5.0},
-    'Jazz': {'Bass': 4.0, 'Mid': 1.0, 'Treble': 3.0},
-    'Vocal': {'Bass': 0.0, 'Mid': 4.0, 'Treble': 0.0},
-    'Hip Hop': {'Bass': 6.0, 'Mid': -1.0, 'Treble': -2.0},
-    'Electronic': {'Bass': 4.0, 'Mid': 0.0, 'Treble': 5.0},
+  // ✅ Real EQ Presets with actual band levels (Android EQ uses -1000 to +1000)
+  static const Map<String, Map<String, int>> _eqPresets = {
+    'Normal': {'Bass': 0, 'Mid': 0, 'Treble': 0},
+    'Bass Boost': {'Bass': 800, 'Mid': 0, 'Treble': -400},
+    'Treble Boost': {'Bass': -400, 'Mid': 0, 'Treble': 800},
+    'Pop': {'Bass': 300, 'Mid': 0, 'Treble': 300},
+    'Rock': {'Bass': 500, 'Mid': 200, 'Treble': 400},
+    'Classical': {'Bass': -200, 'Mid': 100, 'Treble': 500},
+    'Jazz': {'Bass': 400, 'Mid': 100, 'Treble': 300},
+    'Vocal': {'Bass': 0, 'Mid': 400, 'Treble': 0},
+    'Hip Hop': {'Bass': 600, 'Mid': -100, 'Treble': -200},
+    'Electronic': {'Bass': 400, 'Mid': 0, 'Treble': 500},
   };
+
+  // ✅ Real EQ Band IDs (Android Equalizer bands)
+  static const int _bassBand = 0;    // ~60Hz
+  static const int _midBand = 1;     // ~1kHz
+  static const int _trebleBand = 2;  // ~8kHz
 
   Stream<Duration?> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
@@ -44,57 +50,149 @@ class AudioManager {
   String get currentEqPreset => _currentEqPreset;
   Map<String, double> get eqGains => _eqGains;
 
+  // ✅ Android Equalizer Instance
+  bool _isEqualizerInitialized = false;
+
   void init() {
     _player.playerStateStream.listen((state) {
       _isPlaying = state.playing;
       print('State: ${state.processingState}, playing: ${state.playing}');
     });
+    
+    // ✅ Initialize Real Equalizer
+    _initRealEqualizer();
   }
 
   // ============================================================
-  // ✅ EQUALIZER - REAL AUDIO EFFECT
+  // ✅ REAL EQUALIZER INITIALIZATION
+  // ============================================================
+  
+  Future<void> _initRealEqualizer() async {
+    if (!Platform.isAndroid) {
+      print('⚠️ Equalizer only works on Android');
+      return;
+    }
+    
+    try {
+      print('🎛️ Initializing Real Equalizer...');
+      // Wait for audio session to be ready
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      int? sessionId = await _player.androidAudioSessionId;
+      if (sessionId != null && sessionId != 0) {
+        await EqualizerFlutter.init(sessionId);
+        await EqualizerFlutter.setEnabled(true);
+        _isEqualizerInitialized = true;
+        print('✅ Real Equalizer initialized! Session ID: $sessionId');
+        
+        // ✅ Apply current preset
+        await _applyRealEqualizerPreset(_currentEqPreset);
+      } else {
+        print('❌ Failed to get audio session ID');
+      }
+    } catch (e) {
+      print('❌ Equalizer Init Error: $e');
+      _isEqualizerInitialized = false;
+    }
+  }
+
+  // ============================================================
+  // ✅ REAL EQUALIZER PRESETS
   // ============================================================
   
   Future<void> setEqualizerPreset(String presetName) async {
-    if (!_eqPresets.containsKey(presetName)) return;
+    if (!_eqPresets.containsKey(presetName)) {
+      print('⚠️ Unknown preset: $presetName');
+      return;
+    }
     
     _currentEqPreset = presetName;
     final gains = _eqPresets[presetName]!;
-    _eqGains = Map.from(gains);
+    _eqGains = {
+      'Bass': (gains['Bass'] ?? 0) / 100.0,
+      'Mid': (gains['Mid'] ?? 0) / 100.0,
+      'Treble': (gains['Treble'] ?? 0) / 100.0,
+    };
     
-    print('🎛️ Applying Preset: $presetName');
-    print('📊 Gains: Bass=${gains['Bass']}dB, Mid=${gains['Mid']}dB, Treble=${gains['Treble']}dB');
+    print('🎛️ Applying Real Preset: $presetName');
+    print('📊 Gains: Bass=${gains['Bass']}, Mid=${gains['Mid']}, Treble=${gains['Treble']}');
     
-    // ✅ Apply EQ effect using volume + speed for different frequency responses
-    await _applyEQEffect(gains);
+    await _applyRealEqualizerPreset(presetName);
   }
   
-  Future<void> _applyEQEffect(Map<String, double> gains) async {
-    // Since just_audio doesn't have built-in EQ bands,
-    // we simulate EQ using volume and speed effects
+  Future<void> _applyRealEqualizerPreset(String presetName) async {
+    if (!Platform.isAndroid || !_isEqualizerInitialized) {
+      print('⚠️ Equalizer not available, using volume simulation');
+      await _simulateEQ(_eqPresets[presetName]!);
+      return;
+    }
     
-    final bassGain = gains['Bass'] ?? 0.0;
-    final midGain = gains['Mid'] ?? 0.0;
-    final trebleGain = gains['Treble'] ?? 0.0;
+    try {
+      final gains = _eqPresets[presetName]!;
+      
+      // ✅ Apply real EQ bands
+      await EqualizerFlutter.setBandLevel(_bassBand, gains['Bass']!.toDouble());
+      await EqualizerFlutter.setBandLevel(_midBand, gains['Mid']!.toDouble());
+      await EqualizerFlutter.setBandLevel(_trebleBand, gains['Treble']!.toDouble());
+      
+      print('✅ Real EQ Applied: $presetName');
+      
+      // Also update volume for 3D mode compatibility
+      if (_is3DMode) {
+        await _player.setVolume(1.3);
+      }
+    } catch (e) {
+      print('❌ Error applying real EQ: $e');
+      // Fallback to volume simulation
+      await _simulateEQ(_eqPresets[presetName]!);
+    }
+  }
+
+  // ============================================================
+  // ✅ SIMULATE EQ (Fallback when real EQ not available)
+  // ============================================================
+  
+  Future<void> _simulateEQ(Map<String, int> gains) async {
+    final bassGain = gains['Bass'] ?? 0;
+    final midGain = gains['Mid'] ?? 0;
+    final trebleGain = gains['Treble'] ?? 0;
     
-    // Calculate overall volume effect
-    // Bass boost: increase volume slightly for lows
-    // Treble boost: increase volume slightly for highs
-    double volumeEffect = 1.0 + (bassGain + midGain + trebleGain) * 0.015;
+    double volumeEffect = 1.0 + (bassGain + midGain + trebleGain) * 0.00015;
     double finalVolume = _is3DMode ? volumeEffect * 1.3 : volumeEffect;
     
-    // Apply volume (simulates overall gain)
     await _player.setVolume(finalVolume.clamp(0.0, 2.0));
     
-    // For speed effect (subtle pitch change for frequency feel)
-    // Bass boost: slight speed decrease (feels deeper)
-    // Treble boost: slight speed increase (feels brighter)
-    double speedEffect = 1.0 + (trebleGain - bassGain) * 0.002;
+    double speedEffect = 1.0 + (trebleGain - bassGain) * 0.00002;
     await _player.setSpeed(speedEffect.clamp(0.8, 1.2));
-    
-    print('✅ EQ Applied: Volume=${finalVolume.toStringAsFixed(2)}, Speed=${speedEffect.toStringAsFixed(3)}');
   }
+
+  // ============================================================
+  // ✅ UPDATE INDIVIDUAL BAND (for sliders)
+  // ============================================================
   
+  Future<void> updateBand(int bandId, int level) async {
+    if (!Platform.isAndroid || !_isEqualizerInitialized) {
+      print('⚠️ Equalizer not available');
+      return;
+    }
+    
+    try {
+      await EqualizerFlutter.setBandLevel(bandId, level.toDouble());
+      
+      // Update current preset to Custom
+      _currentEqPreset = 'Custom';
+      _eqGains = {
+        'Bass': (bandId == 0) ? level / 100.0 : _eqGains['Bass']!,
+        'Mid': (bandId == 1) ? level / 100.0 : _eqGains['Mid']!,
+        'Treble': (bandId == 2) ? level / 100.0 : _eqGains['Treble']!,
+      };
+      
+      print('✅ Band $bandId set to $level');
+    } catch (e) {
+      print('❌ Error updating band: $e');
+    }
+  }
+
   Future<void> resetEqualizer() async {
     await setEqualizerPreset('Normal');
   }
@@ -112,15 +210,10 @@ class AudioManager {
     } else {
       await _player.setVolume(1.0);
     }
-    
-    // Re-apply EQ if active
-    if (_currentEqPreset != 'Normal') {
-      await _applyEQEffect(_eqPresets[_currentEqPreset]!);
-    }
   }
 
   // ============================================================
-  // PRELOAD & PLAY
+  // PLAYBACK METHODS
   // ============================================================
   
   Future<void> preload(String path, String title, String artist) async {
@@ -154,12 +247,9 @@ class AudioManager {
       await _player.stop();
       await _player.setAudioSource(AudioSource.file(path));
       
-      // Apply EQ if not Normal
-      if (_currentEqPreset != 'Normal') {
-        await _applyEQEffect(_eqPresets[_currentEqPreset]!);
-      }
+      // ✅ Initialize equalizer after audio source is set
+      await _initRealEqualizer();
       
-      // Apply 3D if active
       if (_is3DMode) {
         await _player.setVolume(1.3);
       }
